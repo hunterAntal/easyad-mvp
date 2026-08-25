@@ -42,3 +42,32 @@ test("proxy lets public API routes define their own cache policy", () => {
   const response = proxy(new NextRequest("http://localhost:3000/api/public/devices/INV-1/media"));
   assert.equal(response.headers.get("Cache-Control"), null);
 });
+
+test("proxy defaults to English when no locale or Quebec region is present", () => {
+  const response = proxy(new NextRequest("http://localhost:3000/"));
+  assert.equal(response.headers.get("x-middleware-request-x-easyad-locale"), "en");
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
+test("proxy defaults Quebec requests to French", () => {
+  const response = proxy(new NextRequest("http://localhost:3000/", {
+    headers: {
+      "x-vercel-ip-country": "CA",
+      "x-vercel-ip-country-region": "QC",
+    },
+  }));
+  assert.equal(response.headers.get("x-middleware-request-x-easyad-locale"), "fr");
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
+test("proxy preserves an explicit language choice over Quebec detection", () => {
+  const response = proxy(new NextRequest("http://localhost:3000/", {
+    headers: {
+      cookie: "easyad_locale=en",
+      "x-vercel-ip-country": "CA",
+      "x-vercel-ip-country-region": "QC",
+    },
+  }));
+  assert.equal(response.headers.get("x-middleware-request-x-easyad-locale"), "en");
+  assert.equal(response.headers.get("set-cookie"), null);
+});

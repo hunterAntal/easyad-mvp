@@ -4,8 +4,13 @@ import "./maplibre-inventory-map.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { Feature, Polygon } from "geojson";
-import { FormatKey, InventoryItem, businesses, formats, locations } from "../data";
+import { InventoryItem, businesses, formats, locations } from "../data";
 import { mapBounds } from "../utils";
+import { useI18n } from "../i18n/client";
+import { mapLibreLocale } from "../i18n/maplibre";
+import { translate } from "../i18n/messages";
+import type { Locale } from "../i18n/config";
+import { isMarketplaceInventoryAvailable } from "../lib/inventory-availability";
 
 type MapPoint = {
   x: number;
@@ -16,6 +21,12 @@ type MapSearchResult = MapPoint & {
   id: string;
   label: string;
   detail: string;
+};
+
+export type AvailableCity = MapPoint & {
+  id: string;
+  label: string;
+  inventoryCount: number;
 };
 
 type Props = {
@@ -29,16 +40,16 @@ type Props = {
   initialZoom?: number;
   onSelect?: (id: string) => void;
   onMarkerOpen?: (id: string) => void;
-};
-
-const formatClass: Record<FormatKey, string> = {
-  digital: "digital",
-  static: "static",
-  transit: "transit",
+  variant?: "workspace" | "portal";
 };
 
 const tileSize = 256;
-const initialRasterZoom = 3;
+const FALLBACK_PIN_VIEW_BOX = "0 0 34 40";
+const FALLBACK_PIN_PATH = "M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 10.4 11.6 18.75 15.5 21.5C20.9 35.75 32.5 27.4 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z";
+export const DEFAULT_MAP_VIEW_RADIUS_KM = 30;
+export const DEFAULT_MAP_ZOOM = 9;
+export const DEVICE_MARKER_MIN_ZOOM = 8.5;
+const initialRasterZoom = DEFAULT_MAP_ZOOM;
 const minRasterZoom = 2;
 const maxRasterZoom = 15;
 
@@ -53,15 +64,23 @@ export default function MapLibreInventoryMap({
   initialZoom,
   onSelect,
   onMarkerOpen,
+  variant = "workspace",
 }: Props) {
+  const { locale, t } = useI18n();
+  const isPortal = variant === "portal";
+  const selectionEnabled = !isPortal;
+  const competitorsVisible = showCompetitors && !isPortal;
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRefs = useRef<Marker[]>([]);
   const onAreaChangeRef = useRef(onAreaChange);
   const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "fallback">("loading");
+  const [deviceMarkersVisible, setDeviceMarkersVisible] = useState(() => shouldShowDeviceMarkers(initialZoom ?? DEFAULT_MAP_ZOOM));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const searchResults = useMemo(() => findMapSearchResults(searchQuery, inventory), [inventory, searchQuery]);
+  const searchResults = useMemo(() => findMapSearchResults(searchQuery, inventory, competitorsVisible), [competitorsVisible, inventory, searchQuery]);
+  const availableCities = useMemo(() => getAvailableCities(visibleInventory), [visibleInventory]);
 
   useEffect(() => {
     onAreaChangeRef.current = onAreaChange;
@@ -101,10 +120,11 @@ export default function MapLibreInventoryMap({
           ],
         },
         center: percentToLngLat(selectedLocation),
-        zoom: 3.2,
+        zoom: initialZoom ?? DEFAULT_MAP_ZOOM,
         minZoom: 2,
         maxZoom: 16,
         attributionControl: false,
+        locale: mapLibreLocale(locale),
       });
     } catch {
       setMapStatus("fallback");
@@ -114,30 +134,36 @@ export default function MapLibreInventoryMap({
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "MapLibre GL JS" }), "bottom-right");
     map.doubleClickZoom.disable();
+    const handleZoom = () => syncMapMarkerVisibility(map, setDeviceMarkersVisible);
+    map.on("zoom", handleZoom);
 
     map.on("load", () => {
-      map.addSource("radius-area", { type: "geojson", data: radiusFeature(selectedLocation, radius) });
-      map.addLayer({
-        id: "radius-area-fill",
-        type: "fill",
-        source: "radius-area",
-        paint: {
-          "fill-color": "#26735b",
-          "fill-opacity": 0.14,
-        },
-      });
-      map.addLayer({
-        id: "radius-area-outline",
-        type: "line",
-        source: "radius-area",
-        paint: {
-          "line-color": "#26735b",
-          "line-width": 2,
-          "line-dasharray": [2, 1],
-        },
-      });
+      if (initialZoom === undefined) fitDefaultOperatingRadius(map, selectedLocation, containerRef.current);
+      if (!isPortal) {
+        map.addSource("radius-area", { type: "geojson", data: radiusFeature(selectedLocation, radius) });
+        map.addLayer({
+          id: "radius-area-fill",
+          type: "fill",
+          source: "radius-area",
+          paint: {
+            "fill-color": "#26735b",
+            "fill-opacity": 0.14,
+          },
+        });
+        map.addLayer({
+          id: "radius-area-outline",
+          type: "line",
+          source: "radius-area",
+          paint: {
+            "line-color": "#26735b",
+            "line-width": 2,
+            "line-dasharray": [2, 1],
+          },
+        });
+      }
 
       syncMapData(map, selectedLocation, radius);
+      syncMapMarkerVisibility(map, setDeviceMarkersVisible);
       setMapStatus("ready");
     });
 
@@ -154,10 +180,11 @@ export default function MapLibreInventoryMap({
     return () => {
       markerRefs.current.forEach((marker) => marker.remove());
       markerRefs.current = [];
+      map.off("zoom", handleZoom);
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -170,12 +197,17 @@ export default function MapLibreInventoryMap({
     }
 
     markerRefs.current.forEach((marker) => marker.remove());
-      markerRefs.current = [
-      createCenterMarker(map, selectedLocation),
-      ...createBusinessMarkers(map, showCompetitors),
-      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryId, onSelect, onMarkerOpen),
+    markerRefs.current = [
+      ...(!isPortal ? [createCenterMarker(map, selectedLocation, locale)] : []),
+      ...createBusinessMarkers(map, competitorsVisible, locale),
+      ...createAvailableCityMarkers(map, availableCities, (city) => {
+        onAreaChangeRef.current?.(city);
+        map.easeTo({ center: percentToLngLat(city), zoom: DEFAULT_MAP_ZOOM, duration: 500 });
+      }, locale),
+      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryId, selectionEnabled, locale, onSelect, onMarkerOpen),
     ];
-  }, [inventory, onMarkerOpen, onSelect, radius, selectedInventoryId, selectedLocation, showCompetitors, visibleInventory]);
+    syncMapMarkerVisibility(map, setDeviceMarkersVisible);
+  }, [availableCities, competitorsVisible, inventory, isPortal, locale, onMarkerOpen, onSelect, radius, selectedInventoryId, selectedLocation, selectionEnabled, visibleInventory]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -196,24 +228,28 @@ export default function MapLibreInventoryMap({
 
   return (
     <div className={`maplibre-shell ${mapStatus === "fallback" ? "maplibre-fallback-mode" : ""}`}>
-      <div ref={containerRef} className="city-map maplibre-map" role="application" aria-label="MapLibre inventory map" />
+      <div ref={containerRef} className="city-map maplibre-map" role="application" aria-label={t("MapLibre inventory map")} />
       <div className="map-search" role="search">
         <input
-          aria-label="Map search"
+          aria-label={t("Map search")}
+          ref={searchInputRef}
           value={searchQuery}
-          placeholder="Search address, device, or landmark"
+          placeholder={t("Search address, device, or landmark")}
           onChange={(event) => { setSearchQuery(event.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
-          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); runSearch(); } }}
         />
-        <button type="button" onClick={runSearch} aria-label="Search map">Search</button>
+        <div className="map-search-actions">
+          {searchQuery ? <button type="button" onClick={() => { setSearchQuery(""); setSearchOpen(false); searchInputRef.current?.focus(); }} aria-label={t("Clear map search")}>&times;</button> : null}
+          <button type="button" onClick={runSearch} aria-label={t("Search map")}>{t("Search")}</button>
+        </div>
         {searchOpen && searchQuery.trim() ? (
           <div className="map-search-results">
             {searchResults.length ? searchResults.map((result) => (
               <button key={result.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectSearchResult(result)}>
-                <strong>{result.label}</strong><span>{result.detail}</span>
+                <strong>{result.label}</strong><span>{t(result.detail)}</span>
               </button>
-            )) : <span className="map-search-empty">No map matches</span>}
+            )) : <span className="map-search-empty">{t("No map matches")}</span>}
           </div>
         ) : null}
       </div>
@@ -229,25 +265,68 @@ export default function MapLibreInventoryMap({
           initialZoom={initialZoom}
           onSelect={onSelect}
           onMarkerOpen={onMarkerOpen}
+          onDeviceMarkerVisibilityChange={setDeviceMarkersVisible}
+          availableCities={availableCities}
+          variant={variant}
         />
       ) : null}
-      <div className="map-legend" aria-label="Map legend">
-        <span><i className="legend-dot digital" />Digital</span>
-        <span><i className="legend-dot static" />Static</span>
-        <span><i className="legend-dot transit" />Transit</span>
-        <span><i className="legend-square" />Nearby business</span>
+      <div className="map-legend" aria-label={t("Map legend")}>
+        {deviceMarkersVisible ? (
+          <>
+            <span><i className="legend-device available" />{t("Available device")}</span>
+            {selectionEnabled ? <span><i className="legend-device selected" />{t("Selected device")}</span> : null}
+          </>
+        ) : availableCities.length ? (
+          <>
+            <span><i className="legend-city" />{t("Available city")}</span>
+            <span className="map-zoom-guidance" role="status">{t("Choose a city or zoom in to view devices")}</span>
+          </>
+        ) : <span className="map-zoom-guidance" role="status">{t("No available cities match the current filters")}</span>}
+        {competitorsVisible ? <span><i className="legend-square" />{t("Nearby business")}</span> : null}
       </div>
     </div>
   );
 }
 
-function findMapSearchResults(query: string, inventory: InventoryItem[]) {
+export function getAvailableCities(inventory: InventoryItem[]): AvailableCity[] {
+  const cities = new Map<string, AvailableCity>();
+
+  for (const item of inventory) {
+    if (!isMarketplaceInventoryAvailable(item)) continue;
+    const label = cityLabelFromAddress(item.address);
+    const id = label === "Available location"
+      ? `available-location-${Math.round(item.x)}-${Math.round(item.y)}`
+      : `available-city-${label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+    const existing = cities.get(id);
+
+    if (existing) {
+      // Keep the first matching device as a stable representative point rather
+      // than calculating a centroid that may not correspond to a real device.
+      existing.inventoryCount += 1;
+    } else {
+      cities.set(id, { id, label, x: item.x, y: item.y, inventoryCount: 1 });
+    }
+  }
+
+  return [...cities.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function cityLabelFromAddress(address: string) {
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join(", ") : "Available location";
+}
+
+function cityMarkerAriaLabel(city: AvailableCity, locale: Locale = "en") {
+  return translate(locale, city.inventoryCount === 1 ? "{city}: {count} available device. Zoom in to view devices." : "{city}: {count} available devices. Zoom in to view devices.", { city: city.label, count: city.inventoryCount });
+}
+
+function findMapSearchResults(query: string, inventory: InventoryItem[], includeBusinesses: boolean) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
   const candidates: MapSearchResult[] = [
     ...locations.map((location) => ({ ...location, detail: "Location" })),
     ...inventory.map((item) => ({ id: item.id, label: item.name, detail: [item.address, ...(item.tags ?? [])].join(" - "), x: item.x, y: item.y })),
-    ...businesses.map((business) => ({ id: business.name, label: business.name, detail: business.category, x: business.x, y: business.y })),
+    ...(includeBusinesses ? businesses.map((business) => ({ id: business.name, label: business.name, detail: business.category, x: business.x, y: business.y })) : []),
   ];
   return candidates
     .filter((candidate) => `${candidate.label} ${candidate.detail}`.toLowerCase().includes(normalized))
@@ -265,7 +344,14 @@ function FallbackMap({
   initialZoom,
   onSelect,
   onMarkerOpen,
-}: Props) {
+  onDeviceMarkerVisibilityChange,
+  availableCities,
+  variant = "workspace",
+}: Props & { availableCities: AvailableCity[]; onDeviceMarkerVisibilityChange: (visible: boolean) => void }) {
+  const { locale, t } = useI18n();
+  const isPortal = variant === "portal";
+  const selectionEnabled = !isPortal;
+  const competitorsVisible = showCompetitors && !isPortal;
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     startX: number;
@@ -289,6 +375,11 @@ function FallbackMap({
   };
   const tiles = useMemo(() => getVisibleTiles(viewportOrigin, size, zoom), [size, viewportOrigin.x, viewportOrigin.y, zoom]);
   const radiusPixels = radiusToPixels(radius, center.lat, zoom);
+  const deviceMarkersVisible = shouldShowDeviceMarkers(zoom);
+
+  useEffect(() => {
+    onDeviceMarkerVisibilityChange(deviceMarkersVisible);
+  }, [deviceMarkersVisible, onDeviceMarkerVisibilityChange]);
 
   useEffect(() => {
     const [lng, lat] = percentToLngLat(selectedLocation);
@@ -356,7 +447,7 @@ function FallbackMap({
   }
 
   function canDragFrom(target: EventTarget | null) {
-    return !(target as HTMLElement | null)?.closest(".maplibre-pin, .raster-control");
+    return !(target as HTMLElement | null)?.closest(".device-marker, .city-marker, .raster-control");
   }
 
   function startDrag(input: "pointer" | "mouse", clientX: number, clientY: number) {
@@ -441,10 +532,17 @@ function FallbackMap({
     zoomBy(event.deltaY > 0 ? -1 : 1);
   }
 
+  function focusCity(city: AvailableCity) {
+    const [lng, lat] = percentToLngLat(city);
+    setMapCenter({ lng, lat });
+    setZoom((current) => Math.max(current, DEFAULT_MAP_ZOOM));
+    onAreaChange?.(city);
+  }
+
   return (
     <div
       className="map-fallback raster-map"
-      aria-label="Interactive raster map of North America"
+      aria-label={t("Interactive raster map of North America")}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -467,37 +565,54 @@ function FallbackMap({
           />
         ))}
       </div>
-      <div
-        className="fallback-radius"
-        style={{
-          left: "50%",
-          top: "50%",
-          width: radiusPixels * 2,
-          height: radiusPixels * 2,
-        }}
-      />
+      {!isPortal ? (
+        <div
+          className="fallback-radius"
+          style={{
+            left: "50%",
+            top: "50%",
+            width: radiusPixels * 2,
+            height: radiusPixels * 2,
+          }}
+        />
+      ) : null}
       <div className="fallback-city-label">
-        <strong>North America</strong>
-        <span>Drag to pan, scroll or use buttons to zoom, double-click to set search center</span>
+        <strong>{t("North America")}</strong>
+        <span>{t("Drag to pan, scroll or use buttons to zoom, double-click to set search center")}</span>
         <small>{center.lat.toFixed(4)}, {center.lng.toFixed(4)}</small>
       </div>
       <div className="raster-controls">
-        <button className="raster-control" type="button" onClick={() => zoomBy(1)} aria-label="Zoom in">+</button>
-        <button className="raster-control" type="button" onClick={() => zoomBy(-1)} aria-label="Zoom out">-</button>
+        <button className="raster-control" type="button" onClick={() => zoomBy(1)} aria-label={t("Zoom in")}>+</button>
+        <button className="raster-control" type="button" onClick={() => zoomBy(-1)} aria-label={t("Zoom out")}>-</button>
       </div>
-      <div className="fallback-center" style={markerStyle(selectedLocation, viewportOrigin, zoom)} />
-      {showCompetitors ? businesses.map((business) => (
+      {!isPortal ? <div className="fallback-center" style={markerStyle(selectedLocation, viewportOrigin, zoom)} /> : null}
+      {competitorsVisible ? businesses.map((business) => (
         <div className="fallback-business" key={business.name} title={`${business.name} (${business.category})`} style={markerStyle(business, viewportOrigin, zoom)} />
       )) : null}
-      {inventory.map((item) => {
+      {!deviceMarkersVisible ? availableCities.map((city) => (
+        <button
+          aria-label={cityMarkerAriaLabel(city, locale)}
+          className="city-marker fallback-city-marker"
+          key={city.id}
+          onClick={() => focusCity(city)}
+          style={markerStyle(city, viewportOrigin, zoom)}
+          type="button"
+        >
+          <span aria-hidden="true" className="city-marker-count">{city.inventoryCount}</span>
+        </button>
+      )) : null}
+      {deviceMarkersVisible ? inventory.map((item) => {
         const visible = visibleIds.has(item.id);
-        const selected = item.id === selectedInventoryId;
-        const className = `maplibre-pin fallback-pin ${formatClass[item.format]} ${visible ? "visible" : "muted"} ${selected ? "selected" : ""}`;
-        const content = <><strong>{item.id.replace("INV-", "")}</strong><span>{formats[item.format].label}</span></>;
+        const selected = selectionEnabled && item.id === selectedInventoryId;
+        const className = `device-marker fallback-pin ${visible ? "visible" : "muted"} ${selected ? "selected" : ""}`;
         const style = markerStyle(item, viewportOrigin, zoom);
 
-        return <button className={className} key={item.id} onClick={() => { onSelect?.(item.id); onMarkerOpen?.(item.id); }} style={style} type="button">{content}</button>;
-      })}
+        return (
+          <button aria-label={`${item.name}, ${t(formats[item.format].label)}`} aria-pressed={selectionEnabled ? selected : undefined} className={className} key={item.id} onClick={() => { onSelect?.(item.id); onMarkerOpen?.(item.id); }} style={style} type="button">
+            <DevicePinGlyph />
+          </button>
+        );
+      }) : null}
     </div>
   );
 }
@@ -563,6 +678,42 @@ function radiusToPixels(radiusKm: number, latitude: number, zoom: number) {
   return Math.max(18, (radiusKm * 1000) / metersPerPixel);
 }
 
+export function shouldShowDeviceMarkers(zoom: number) {
+  return zoom >= DEVICE_MARKER_MIN_ZOOM;
+}
+
+function fitDefaultOperatingRadius(map: MapLibreMap, center: MapPoint, container: HTMLElement | null) {
+  const shortestSide = Math.min(container?.clientWidth || 560, container?.clientHeight || 560);
+  const padding = clamp(Math.round(shortestSide * 0.09), 24, 48);
+  map.fitBounds(radiusBounds(center, DEFAULT_MAP_VIEW_RADIUS_KM), {
+    padding,
+    duration: 0,
+    maxZoom: 11,
+  });
+}
+
+function radiusBounds(center: MapPoint, radiusKm: number): [[number, number], [number, number]] {
+  const [longitude, latitude] = percentToLngLat(center);
+  const latitudeDelta = radiusKm / 111.32;
+  const longitudeScale = Math.max(0.2, Math.cos(toRadians(latitude)));
+  const longitudeDelta = radiusKm / (111.32 * longitudeScale);
+  return [
+    [longitude - longitudeDelta, latitude - latitudeDelta],
+    [longitude + longitudeDelta, latitude + latitudeDelta],
+  ];
+}
+
+function syncMapMarkerVisibility(map: MapLibreMap, onChange: (visible: boolean) => void) {
+  const visible = shouldShowDeviceMarkers(map.getZoom());
+  map.getContainer().querySelectorAll<HTMLElement>(".device-marker").forEach((marker) => {
+    marker.hidden = !visible;
+  });
+  map.getContainer().querySelectorAll<HTMLElement>(".city-marker").forEach((marker) => {
+    marker.hidden = visible;
+  });
+  onChange(visible);
+}
+
 function syncMapData(map: MapLibreMap, selectedLocation: MapPoint, radius: number) {
   const source = map.getSource("radius-area") as GeoJSONSource | undefined;
   source?.setData(radiusFeature(selectedLocation, radius));
@@ -573,6 +724,8 @@ function createInventoryMarkers(
   inventory: InventoryItem[],
   visibleInventory: InventoryItem[],
   selectedInventoryId: string,
+  selectionEnabled: boolean,
+  locale: Locale,
   onSelect?: (id: string) => void,
   onMarkerOpen?: (id: string) => void,
 ) {
@@ -580,52 +733,109 @@ function createInventoryMarkers(
 
   return inventory.map((item) => {
     const visible = visibleIds.has(item.id);
-    const selected = item.id === selectedInventoryId;
+    const selected = selectionEnabled && item.id === selectedInventoryId;
     const element = document.createElement("button");
     element.type = "button";
-    element.className = `maplibre-pin ${formatClass[item.format]} ${visible ? "visible" : "muted"} ${selected ? "selected" : ""}`;
-    element.setAttribute("aria-label", `${item.name}, ${formats[item.format].label}`);
-    const idLabel = document.createElement("strong");
-    idLabel.textContent = item.id.replace("INV-", "");
-    const formatLabel = document.createElement("span");
-    formatLabel.textContent = formats[item.format].label;
-    element.append(idLabel, formatLabel);
+    element.className = ["device-marker", "maplibre-device-marker", visible ? "visible" : "muted", selected ? "selected" : null].filter(Boolean).join(" ");
+    element.style.color = selected ? "var(--workspace-green)" : "var(--workspace-muted)";
+    element.setAttribute("aria-label", `${item.name}, ${translate(locale, formats[item.format].label)}`);
+    if (selectionEnabled) element.setAttribute("aria-pressed", String(selected));
+    element.append(createDevicePinGlyphElement());
 
     element.addEventListener("click", (event) => { event.preventDefault(); onSelect?.(item.id); onMarkerOpen?.(item.id); });
 
-    return new maplibregl.Marker({ element, anchor: "bottom" })
+    return new maplibregl.Marker({ element, anchor: "bottom", subpixelPositioning: true })
       .setLngLat(percentToLngLat(item))
-      .setPopup(new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(item)))
+      .setPopup(new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(item, locale)))
       .addTo(map);
   });
 }
 
-function createBusinessMarkers(map: MapLibreMap, showCompetitors: boolean) {
+function createDevicePinGlyphElement() {
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNamespace, "svg");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "device-pin-glyph");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("viewBox", FALLBACK_PIN_VIEW_BOX);
+
+  const path = document.createElementNS(svgNamespace, "path");
+  path.setAttribute("class", "device-pin-body");
+  path.setAttribute("d", FALLBACK_PIN_PATH);
+  const dot = document.createElementNS(svgNamespace, "circle");
+  dot.setAttribute("class", "device-pin-dot");
+  dot.setAttribute("cx", "17");
+  dot.setAttribute("cy", "16.5");
+  dot.setAttribute("r", "5");
+  svg.append(path, dot);
+
+  return svg;
+}
+
+function createAvailableCityMarkers(
+  map: MapLibreMap,
+  cities: AvailableCity[],
+  onOpen: (city: AvailableCity) => void,
+  locale: Locale,
+) {
+  return cities.map((city) => {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = "city-marker maplibre-city-marker";
+    element.setAttribute("aria-label", cityMarkerAriaLabel(city, locale));
+
+    const count = document.createElement("span");
+    count.className = "city-marker-count";
+    count.setAttribute("aria-hidden", "true");
+    count.textContent = String(city.inventoryCount);
+    element.append(count);
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onOpen(city);
+    });
+
+    return new maplibregl.Marker({ element, anchor: "center", subpixelPositioning: true })
+      .setLngLat(percentToLngLat(city))
+      .addTo(map);
+  });
+}
+
+function DevicePinGlyph() {
+  return (
+    <svg aria-hidden="true" className="device-pin-glyph fallback-pin-glyph" focusable="false" viewBox={FALLBACK_PIN_VIEW_BOX}>
+      <path className="device-pin-body fallback-pin-body" d={FALLBACK_PIN_PATH} />
+      <circle className="device-pin-dot fallback-pin-dot" cx="17" cy="16.5" r="5" />
+    </svg>
+  );
+}
+
+function createBusinessMarkers(map: MapLibreMap, showCompetitors: boolean, locale: Locale) {
   if (!showCompetitors) return [];
 
   return businesses.map((business) => {
     const element = document.createElement("div");
     element.className = "maplibre-business";
-    element.title = `${business.name} (${business.category})`;
+    element.title = `${business.name} (${translate(locale, business.category)})`;
     return new maplibregl.Marker({ element })
       .setLngLat(percentToLngLat(business))
       .addTo(map);
   });
 }
 
-function createCenterMarker(map: MapLibreMap, selectedLocation: MapPoint) {
+function createCenterMarker(map: MapLibreMap, selectedLocation: MapPoint, locale: Locale) {
   const element = document.createElement("div");
   element.className = "maplibre-center";
-  element.title = "Search center";
+  element.title = translate(locale, "Search center");
   return new maplibregl.Marker({ element }).setLngLat(percentToLngLat(selectedLocation)).addTo(map);
 }
 
-function popupHtml(item: InventoryItem) {
+function popupHtml(item: InventoryItem, locale: Locale) {
   return `
     <div class="map-popup">
       <strong>${escapeHtml(item.name)}</strong>
       <span>${escapeHtml(item.address)}</span>
-      <small>${formats[item.format].label} - ${item.impressions.toLocaleString("en-US")} impressions</small>
+      <small>${escapeHtml(translate(locale, formats[item.format].label))} - ${escapeHtml(translate(locale, "{count} impressions", { count: new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA").format(item.impressions) }))}</small>
     </div>
   `;
 }

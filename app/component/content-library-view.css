@@ -14,7 +14,12 @@
 .cms-toolbar input, .cms-toolbar select { height: 40px; width: 100%; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 0 11px; }
 .cms-search { position: relative; align-self: end; }
 .cms-search svg { position: absolute; z-index: 1; left: 11px; bottom: 11px; width: 17px; height: 17px; color: var(--muted); }
-.cms-search input { padding-left: 36px; }
+.cms-search input { padding: 0 38px 0 36px; }
+.cms-search button { position: absolute; right: 5px; bottom: 5px; width: 30px; height: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.cms-search button:hover { color: var(--ink); background: var(--soft); }
+.cms-search button:focus-visible { outline: none; box-shadow: var(--ring); }
+.cms-search button:active { transform: translateY(1px); }
+.cms-search button svg { position: static; width: 15px; height: 15px; }
 .cms-browser { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; min-height: 480px; }
 .cms-resource-grid { align-content: start; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cms-resource-card { overflow: hidden; min-width: 0; padding: 0; text-align: left; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }

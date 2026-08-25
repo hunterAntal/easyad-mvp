@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { InventoryItem } from "../data";
 import { formats } from "../data";
 import { mapBounds, money, number } from "../utils";
+import { useI18n } from "../i18n/client";
 
 type GoogleMapsGlobal = {
   maps: {
@@ -56,6 +57,7 @@ type Props = {
 const defaultCenter = { x: 67.29, y: 40.95 };
 
 export default function GoogleInventoryMap({ apiKey, inventory, center = defaultCenter }: Props) {
+  const { formatNumber, locale, t } = useI18n();
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<GoogleMap | null>(null);
   const markerRefs = useRef<GoogleMarker[]>([]);
@@ -163,8 +165,8 @@ export default function GoogleInventoryMap({ apiKey, inventory, center = default
   if (!apiKey) {
     return (
       <div className="google-map-empty">
-        <strong>Google Maps API key required</strong>
-        <span>Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local`, then restart the dev server.</span>
+        <strong>{t("Google Maps API key required")}</strong>
+        <span>{t("Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local`, then restart the dev server.")}</span>
       </div>
     );
   }
@@ -173,15 +175,15 @@ export default function GoogleInventoryMap({ apiKey, inventory, center = default
     <div className="google-map-frame">
       <div className="google-map-toolbar">
         <label>
-          Device
+          {t("Device")}
           <select value={selectedItem?.id ?? ""} onChange={(event) => setSelectedId(event.target.value)}>
             {inventory.length ? inventory.map((item) => (
               <option key={item.id} value={item.id}>{item.name}</option>
-            )) : <option value="">No published inventory</option>}
+            )) : <option value="">{t("No published inventory")}</option>}
           </select>
         </label>
         <label>
-          Radius
+          {t("Radius")}
           <input
             type="range"
             min="8"
@@ -192,20 +194,20 @@ export default function GoogleInventoryMap({ apiKey, inventory, center = default
           <span>{radiusKm} km</span>
         </label>
         <label>
-          Layer
+          {t("Layer")}
           <select value={mapType} onChange={(event) => setMapType(event.target.value as "roadmap" | "satellite")}>
-            <option value="roadmap">Roadmap</option>
-            <option value="satellite">Satellite</option>
+            <option value="roadmap">{t("Roadmap")}</option>
+            <option value="satellite">{t("Satellite")}</option>
           </select>
         </label>
       </div>
-      <div ref={mapElementRef} className="google-map-canvas" role="application" aria-label="Google inventory map" />
-      {status !== "ready" ? <div className="google-map-status">{status === "error" ? "Google Maps failed to load." : "Loading Google Maps..."}</div> : null}
+      <div ref={mapElementRef} className="google-map-canvas" role="application" aria-label={t("Google inventory map")} />
+      {status !== "ready" ? <div className="google-map-status">{t(status === "error" ? "Google Maps failed to load." : "Loading Google Maps...")}</div> : null}
       {selectedItem ? (
         <div className="google-map-summary">
           <strong>{selectedItem.name}</strong>
           <span>{selectedItem.address}</span>
-          <span>{formats[selectedItem.format].label} - {number(selectedItem.impressions)} impressions - {money(selectedItem.price)}/day</span>
+          <span>{t(formats[selectedItem.format].label)} - {t("{count} impressions", { count: formatNumber(selectedItem.impressions) })} - {t("{amount}/day", { amount: money(selectedItem.price, locale) })}</span>
         </div>
       ) : null}
     </div>

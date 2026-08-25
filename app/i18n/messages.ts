@@ -1,0 +1,178 @@
+import type { Locale } from "./config";
+import { frAdditional } from "./fr-additional";
+
+type Variables = Record<string, string | number>;
+type Messages = Record<string, string>;
+
+const fr: Messages = {
+  "Language": "Langue",
+  "English": "English",
+  "French": "Français",
+  "EasyAD Platform": "Plateforme EasyAD",
+  "Civic Screen Operations": "Gestion des écrans civiques",
+  "Sign in": "Se connecter",
+  "Sign out": "Se déconnecter",
+  "Close": "Fermer",
+  "Cancel": "Annuler",
+  "Save": "Enregistrer",
+  "Save changes": "Enregistrer les modifications",
+  "Delete": "Supprimer",
+  "Add": "Ajouter",
+  "Edit": "Modifier",
+  "Search": "Rechercher",
+  "Clear": "Effacer",
+  "Reset": "Réinitialiser",
+  "Back": "Retour",
+  "Continue": "Continuer",
+  "Submit": "Soumettre",
+  "Upload": "Téléverser",
+  "Download": "Télécharger",
+  "Approve": "Approuver",
+  "Reject": "Refuser",
+  "Publish": "Publier",
+  "Unpublish": "Dépublier",
+  "Active": "Actif",
+  "Inactive": "Inactif",
+  "Available": "Disponible",
+  "Unavailable": "Indisponible",
+  "Loading": "Chargement",
+  "Error": "Erreur",
+  "Success": "Réussite",
+  "Name": "Nom",
+  "Email": "Courriel",
+  "Password": "Mot de passe",
+  "Role": "Rôle",
+  "Status": "Statut",
+  "Type": "Type",
+  "Campaign": "Campagne",
+  "Creative": "Création",
+  "Dates": "Dates",
+  "Spend": "Dépenses",
+  "{count} slot": "{count} emplacement",
+  "{count} slots": "{count} emplacements",
+  "pending approval": "en attente d'approbation",
+  "approved": "approuvé",
+  "rejected": "refusé",
+  "pending review": "en attente de révision",
+  "creative review": "révision de la création",
+  "completed": "terminé",
+  "That didn't work. Please try again.": "L'opération a échoué. Veuillez réessayer.",
+  "Something went wrong.": "Une erreur est survenue.",
+  "Date": "Date",
+  "Start": "Début",
+  "End": "Fin",
+  "Actions": "Actions",
+  "Details": "Détails",
+  "Workspace": "Espace de travail",
+  "Workspace summary": "Sommaire de l'espace de travail",
+  "Available workspaces": "Espaces de travail disponibles",
+  "Active workspace": "Espace de travail actif",
+  "Secure workspace": "Espace de travail sécurisé",
+  "Demo workspace": "Espace de démonstration",
+  "Sign in to save changes": "Connectez-vous pour enregistrer les modifications",
+  "Portal": "Portail",
+  "Marketplace": "Marché",
+  "Discover": "Découvrir",
+  "Booking": "Réservation",
+  "Campaigns": "Campagnes",
+  "Creative studio": "Studio de création",
+  "Content": "Contenu",
+  "Performance": "Performance",
+  "Billing": "Facturation",
+  "Inventory": "Inventaire",
+  "Schedule": "Calendrier",
+  "Approvals": "Approbations",
+  "Team": "Équipe",
+  "Accounts": "Comptes",
+  "Analytics": "Analytique",
+  "Revenue": "Revenus",
+  "Network control": "Contrôle du réseau",
+  "Screen control": "Contrôle des écrans",
+  "Command centre": "Centre de commande",
+  "Screens": "Écrans",
+  "Media library": "Médiathèque",
+  "People and access": "Personnes et accès",
+  "Workspace navigation": "Navigation de l'espace de travail",
+  "Civic Screen Operations navigation": "Navigation de la gestion des écrans civiques",
+  "{role} navigation": "Navigation - {role}",
+  "Operations": "Opérations",
+  "Insights": "Aperçus",
+  "Fleet operations": "Opérations du parc",
+  "Oversight": "Supervision",
+  "Open EasyAD Platform": "Ouvrir la plateforme EasyAD",
+  "Media operations": "Opérations médias",
+  "Public display command": "Commande des affichages publics",
+  "Cross-institution oversight": "Supervision multi-institutions",
+  "Institution network": "Réseau de l'institution",
+  "Outdoor campaign buying portal": "Portail d'achat de campagnes extérieures",
+  "Public screen network control": "Contrôle du réseau d'écrans publics",
+  "Map-based inventory search": "Recherche d'inventaire sur carte",
+  "Booking request": "Demande de réservation",
+  "Campaign spaces": "Espaces de campagne",
+  "Creative production suite": "Suite de production créative",
+  "Content management": "Gestion du contenu",
+  "Inventory management": "Gestion de l'inventaire",
+  "Availability calendar": "Calendrier des disponibilités",
+  "Approval workflow": "Processus d'approbation",
+  "Account management": "Gestion des comptes",
+  "Campaign analytics": "Analytique des campagnes",
+  "Payments and billing": "Paiements et facturation",
+  "Institution workspace": "Espace de travail de l'institution",
+  "Plan a campaign": "Planifier une campagne",
+  "Reserve media": "Réserver un média",
+  "Manage campaigns": "Gérer les campagnes",
+  "Build and validate": "Créer et valider",
+  "Resource library": "Bibliothèque de ressources",
+  "Device network": "Réseau d'appareils",
+  "Scheduling": "Planification",
+  "Review queue": "File de révision",
+  "Finance": "Finances",
+  "Screen network command centre": "Centre de commande du réseau d'écrans",
+  "Institution systems": "Systèmes de l'institution",
+  "Authenticated operating session": "Session d'exploitation authentifiée",
+  "Matching units": "Unités correspondantes",
+  "Average occupancy": "Occupation moyenne",
+  "Booked value": "Valeur réservée",
+  "Notifications": "Notifications",
+  "Dismiss notification": "Fermer la notification",
+  "Close dialog": "Fermer la boîte de dialogue",
+  "Show password": "Afficher le mot de passe",
+  "Hide password": "Masquer le mot de passe",
+  "Select language": "Choisir la langue",
+};
+
+const messages: Record<Locale, Messages> = { en: {}, fr: { ...fr, ...frAdditional } };
+
+export function translate(locale: Locale, message: string, variables?: Variables) {
+  const template = messages[locale][message] ?? (locale === "fr" ? translateFrenchPattern(message) : message);
+  if (!variables) return template;
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => String(variables[key] ?? match));
+}
+
+function translateFrenchPattern(message: string) {
+  const patterns: Array<[RegExp, (...parts: string[]) => string]> = [
+    [/^Expected (.+), received (.+)\.$/, (expected, received) => `Attendu : ${expected}; reçu : ${received}.`],
+    [/^Requires at least (.+)% margin for this format\.$/, (margin) => `Ce format exige une marge d'au moins ${margin} %.`],
+    [/^Artwork scaling must stay under 3% distortion\.$/, () => "La mise à l'échelle de la création doit rester sous 3 % de distorsion."],
+    [/^Maximum accepted file size is (.+) MB\.$/, (size) => `La taille maximale acceptée est de ${size} Mo.`],
+    [/^Allowed: (.+)\.$/, (types) => `Types permis : ${types}.`],
+    [/^(.+) published\.$/, (name) => `${name} a été publié.`],
+    [/^(.+) approved\.$/, (name) => `${name} a été approuvé.`],
+    [/^(.+) rejected\.$/, (name) => `${name} a été refusé.`],
+    [/^Invoice (.+) refunded\.$/, (id) => `Facture ${id} remboursée.`],
+    [/^Invoice (.+) charged\.$/, (id) => `Facture ${id} débitée.`],
+  ];
+  for (const [pattern, replacement] of patterns) {
+    const match = message.match(pattern);
+    if (match) return replacement(...match.slice(1));
+  }
+  return message;
+}
+
+export function hasTranslation(locale: Locale, message: string) {
+  return locale === "en" || Object.hasOwn(messages[locale], message);
+}
+
+export function getMessages(locale: Locale) {
+  return messages[locale];
+}

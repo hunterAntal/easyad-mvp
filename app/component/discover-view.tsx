@@ -9,6 +9,9 @@ import FiltersPanel from "./filters-panel";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import PlacePanel from "./place-panel";
 import { Meter, Metric, PanelHeading } from "./shared-ui";
+import { useI18n } from "../i18n/client";
+import { inventoryAvailabilityLabel } from "../lib/inventory-availability";
+import { isStaticInventory } from "../lib/inventory-delivery";
 
 export default function DiscoverView(props: {
   filters: Filters;
@@ -28,12 +31,13 @@ export default function DiscoverView(props: {
   onBook: () => void;
   canComment?: boolean;
 }) {
+  const { t } = useI18n();
   const [openPlaceId, setOpenPlaceId] = useState<string | null>(null);
   const openPlace = openPlaceId ? props.inventory.find((item) => item.id === openPlaceId) ?? null : null;
   return (
     <section className="grid discover-grid">
       <div className="panel filters-panel">
-        <PanelHeading eyebrow="Spatial filters" title="Discovery" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>Reset</button>} />
+        <PanelHeading eyebrow="Spatial filters" title="Discovery" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
         <FiltersPanel {...props} />
       </div>
       <div className="map-stage">
@@ -51,7 +55,7 @@ export default function DiscoverView(props: {
         />
       </div>
       <div className="panel list-panel">
-        <PanelHeading eyebrow="Inventory" title={`${props.visibleInventory.length} matches`} />
+        <PanelHeading eyebrow="Inventory" title={t("{count} matches", { count: props.visibleInventory.length })} />
         <div className="inventory-list">
           {props.visibleInventory.map((item) => (
             <InventoryCard key={item.id} item={item} selected={item.id === props.selectedInventoryId} onSelect={props.setSelectedInventoryId} />
@@ -69,6 +73,8 @@ export default function DiscoverView(props: {
 }
 
 function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { distance: number }; selected: boolean; onSelect: (id: string) => void }) {
+  const { locale, formatNumber, t } = useI18n();
+  const availability = inventoryAvailabilityLabel(item);
   return (
     <button className={`inventory-card ${selected ? "selected" : ""}`} type="button" onClick={() => onSelect(item.id)}>
       <div>
@@ -76,13 +82,14 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
         <span>{item.address}</span>
       </div>
       <div className="card-meta">
-        <span>{formats[item.format].label}</span>
-        <span>{money(item.price)}/day</span>
+        <span>{t(formats[item.format].label)}</span>
+        <span>{t("{amount}/day", { amount: money(item.price, locale) })}</span>
       </div>
-      {item.tags?.length ? <div className="device-tag-list">{item.tags.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}</div> : null}
+      {isStaticInventory(item) ? <span className={`status ${availability === "Available" ? "good" : "bad"}`}>{t(availability)}</span> : null}
+      {item.tags?.length ? <div className="device-tag-list">{item.tags.slice(0, 4).map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
       <Meter value={item.occupancy} />
       <div className="card-stats">
-        <span>{number(item.impressions)} impressions</span>
+        <span>{t("{count} impressions", { count: formatNumber(item.impressions) })}</span>
         <span>{Math.round(item.distance)} km</span>
       </div>
     </button>
@@ -90,39 +97,42 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
 }
 
 function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; bookings: Booking[]; onBook: () => void }) {
+  const { locale, formatNumber, t } = useI18n();
   const spec = formats[item.format];
   const campaigns = bookings.filter((booking) => booking.inventoryId === item.id);
+  const availability = inventoryAvailabilityLabel(item);
   return (
     <>
-      <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>Book</button>} />
+      <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Book")}</button>} />
       <div className="detail-grid">
-        <Metric label="Format" value={spec.label} />
-        <Metric label="Rate" value={`${money(item.price)}/day`} />
-        <Metric label="Impressions" value={number(item.impressions)} />
-        <Metric label="Traffic" value={number(item.traffic)} />
-        <Metric label="Income index" value={money(item.income)} />
-        <Metric label="Audience" value={item.audience} />
-        <Metric label="Competitors" value={item.competitor} />
+        <Metric label="Format" value={t(spec.label)} />
+        <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />
+        <Metric label="Impressions" value={formatNumber(item.impressions)} />
+        <Metric label="Traffic" value={formatNumber(item.traffic)} />
+        <Metric label="Income index" value={money(item.income, locale)} />
+        <Metric label="Audience" value={t(item.audience)} />
+        <Metric label="Competitors" value={t(item.competitor)} />
         <Metric label="Nearby businesses" value={businesses.filter((business) => mapDistanceKm(item, business) < 13).length} />
+        {isStaticInventory(item) ? <Metric label="Status" value={t(availability)} /> : null}
       </div>
       <div className="spec-box">
-        <strong>Creative spec</strong>
-        <span>{spec.spec}</span>
-        <span>Aspect ratio {formatRatio(spec.ratio)} with {spec.safeZone}% safe zone.</span>
+        <strong>{t("Creative spec")}</strong>
+        <span>{t(spec.spec)}</span>
+        <span>{t("Aspect ratio {ratio} with {percent}% safe zone.", { ratio: formatRatio(spec.ratio), percent: spec.safeZone })}</span>
       </div>
-      {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div> : null}
+      {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
       <div className="timeline">
         {campaigns.length ? campaigns.map((booking) => (
           <div key={booking.id}>
-            <span>{booking.start} to {booking.end}</span>
+            <span>{booking.start} {t("to")} {booking.end}</span>
             <strong>{booking.campaign}</strong>
-            <small>{booking.status}</small>
+            <small>{t(booking.status)}</small>
           </div>
         )) : (
           <div>
-            <span>No confirmed bookings</span>
-            <strong>Available</strong>
-            <small>{item.availableFrom} to {item.availableTo}</small>
+            <span>{t("No confirmed bookings")}</span>
+            <strong>{t(isStaticInventory(item) ? availability : "Available")}</strong>
+            <small>{item.availableFrom} {t("to")} {item.availableTo}</small>
           </div>
         )}
       </div>

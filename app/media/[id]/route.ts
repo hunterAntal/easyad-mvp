@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPublicMediaResource } from "../../lib/db";
+import { canManageInventoryRecord, getCurrentUser } from "../../lib/auth";
+import { getInventory, getMediaResource, getPublicMediaResource } from "../../lib/db";
 import { readStoredMedia } from "../../lib/media-storage";
 import { isSafeMediaMimeType } from "../../lib/uploads";
 
@@ -9,7 +10,21 @@ type RouteContext = {
 
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  const entry = await getPublicMediaResource(id);
+  let entry = await getPublicMediaResource(id);
+  if (!entry) {
+    const [user, privateMedia] = await Promise.all([getCurrentUser(), getMediaResource(id)]);
+    if (user && privateMedia) {
+      const inventory = await getInventory(privateMedia.resource.inventoryId);
+      if (privateMedia.resource.ownerId === user.id || inventory && canManageInventoryRecord(user, inventory)) {
+        entry = {
+          originalName: privateMedia.resource.originalName,
+          mimeType: privateMedia.resource.mimeType,
+          storagePath: privateMedia.storagePath,
+          cacheable: false,
+        };
+      }
+    }
+  }
   if (!entry) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
 
   let stored;

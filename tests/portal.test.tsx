@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import type { InventoryItem } from "../app/data";
 import Portal from "../app/component/portal";
@@ -9,7 +9,9 @@ import type { DbUser } from "../app/lib/db";
 import { defaultFilters } from "../app/utils";
 
 vi.mock("../app/component/maplibre-inventory-map", () => ({
-  default: () => <div data-testid="inventory-map" />,
+  default: (props: { inventory: InventoryItem[]; showCompetitors: boolean; variant?: string }) => (
+    <div data-inventory-count={props.inventory.length} data-show-competitors={String(props.showCompetitors)} data-testid="inventory-map" data-variant={props.variant} />
+  ),
 }));
 
 const inventory: InventoryItem[] = [
@@ -83,8 +85,6 @@ function renderPortal(currentUser: DbUser | null) {
     <Portal
       inventory={inventory}
       bookings={[]}
-      visibleInventory={[{ ...inventory[0], distance: 0 }]}
-      selectedInventoryId={inventory[0].id}
       selectedLocation={{ x: 50, y: 50 }}
       filters={defaultFilters}
       launch={vi.fn()}
@@ -95,15 +95,52 @@ function renderPortal(currentUser: DbUser | null) {
 }
 
 describe("portal institutional entry", () => {
-  test.each([users.institutional, users.admin])("shows the institutional portal link for $role users", (user) => {
+  test.each([users.institutional, users.admin, users.advertiser, users.operator, null])("shows the public institution overview entry at the end of the landing page", (user) => {
     renderPortal(user);
 
-    expect(screen.getByRole("link", { name: "Institution Portal" })).toHaveAttribute("href", "/?role=institutional&view=inventory");
+    const header = screen.getByRole("banner");
+    expect(within(header).queryByRole("link", { name: /institution|public screen/i })).not.toBeInTheDocument();
+    expect(within(header).queryByRole("link", { name: "Operator Portal" })).not.toBeInTheDocument();
+    expect(screen.getByText("Government, institutions, and large networks")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View workspace details" })).toHaveAttribute("href", "/government/about");
+    expect(screen.getByRole("main").lastElementChild).toHaveClass("portal-institution-gateway");
+  });
+});
+
+describe("portal availability map", () => {
+  test("uses the simplified portal variant without campaign overlays", () => {
+    renderPortal(null);
+
+    expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-variant", "portal");
+    expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-show-competitors", "false");
+    expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-inventory-count", "1");
+    expect(screen.queryByText("Audience match")).not.toBeInTheDocument();
+    expect(screen.queryByText("Creative status")).not.toBeInTheDocument();
   });
 
-  test.each([null, users.advertiser, users.operator])("hides the institutional portal link for unauthorized users", (user) => {
-    renderPortal(user);
+  test("excludes unavailable physical billboards from the availability count and map", () => {
+    const unavailableStatic = {
+      ...inventory[0],
+      id: "INV-STATIC-UNAVAILABLE",
+      name: "Unavailable Billboard",
+      format: "static" as const,
+      deliveryMode: "static" as const,
+      availableFrom: "2000-01-01",
+      availableTo: "2001-01-01",
+    };
+    render(
+      <Portal
+        inventory={[inventory[0], unavailableStatic]}
+        bookings={[]}
+        selectedLocation={{ x: 50, y: 50 }}
+        filters={defaultFilters}
+        launch={vi.fn()}
+        selectFormat={vi.fn()}
+        currentUser={null}
+      />,
+    );
 
-    expect(screen.queryByRole("link", { name: "Institution Portal" })).not.toBeInTheDocument();
+    expect(screen.getByText("1 available units")).toBeInTheDocument();
+    expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-inventory-count", "1");
   });
 });

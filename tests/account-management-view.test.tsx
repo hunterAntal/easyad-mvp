@@ -73,8 +73,54 @@ test("super admin can filter accounts by searchable details and role", async () 
   expect(screen.getAllByText("Civic Media")).toHaveLength(2);
   expect(screen.queryByText("Northern Coffee")).not.toBeInTheDocument();
 
-  await userEventInstance.clear(screen.getByLabelText("Search accounts"));
+  await userEventInstance.click(screen.getByRole("button", { name: "Clear account search" }));
+  expect(screen.getByLabelText("Search accounts")).toHaveFocus();
   await userEventInstance.selectOptions(screen.getByLabelText("Filter by role"), "advertiser");
   expect(screen.getAllByText("Northern Coffee")).toHaveLength(2);
   expect(screen.queryByText("Civic Media")).not.toBeInTheDocument();
+});
+
+test("super admin can provision an Institution account role", async () => {
+  const userEventInstance = userEvent.setup();
+  const institution: DbUser = {
+    ...user,
+    id: "USR-NEW-INSTITUTION",
+    name: "Lakehead Public Services",
+    email: "screens@lakehead.example",
+    role: "institutional",
+    operatorLimit: 8,
+  };
+  const onCreateAccount = vi.fn().mockResolvedValue({ user: institution });
+
+  render(
+    <AccountManagementView
+      users={[user]}
+      bookings={[]}
+      inventory={inventory}
+      creatives={[]}
+      mediaResources={[]}
+      onCreateAccount={onCreateAccount}
+      onUpdateAccount={vi.fn().mockResolvedValue(true)}
+      onDeleteAccount={vi.fn().mockResolvedValue(true)}
+    />,
+  );
+
+  await userEventInstance.type(screen.getByLabelText("Name"), institution.name);
+  await userEventInstance.type(screen.getByLabelText("Email"), institution.email);
+  await userEventInstance.type(screen.getByLabelText("Temporary password"), "SecurePass!2026");
+  await userEventInstance.selectOptions(screen.getByLabelText("New account role"), "institutional");
+  await userEventInstance.clear(screen.getByLabelText("Operator seats"));
+  await userEventInstance.type(screen.getByLabelText("Operator seats"), "8");
+
+  expect(screen.getByText(/Institution accounts open the dedicated Civic Screen Operations dashboard at \/government/)).toBeInTheDocument();
+  await userEventInstance.click(screen.getByRole("button", { name: "Create account" }));
+
+  expect(onCreateAccount).toHaveBeenCalledWith({
+    name: institution.name,
+    email: institution.email,
+    password: "SecurePass!2026",
+    role: "institutional",
+    institutionId: null,
+    operatorLimit: 8,
+  });
 });

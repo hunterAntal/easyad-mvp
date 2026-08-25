@@ -1,5 +1,6 @@
 import type { InventoryAdvertiserResource, InventoryItem, MediaResource } from "../data";
 import { getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "./db";
+import { isDigitalInventory } from "./inventory-delivery";
 
 export type PublicDeviceMediaItem = {
   id: string;
@@ -24,11 +25,11 @@ export type ActiveDeviceMedia = {
 };
 
 const activeBookingStatuses = new Set(["approved", "scheduled", "live"]);
-const supportedMimeTypes = new Set(["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"]);
+const supportedMimeTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm"]);
 
 export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate()) {
   const inventory = await getPublishedInventory(deviceId);
-  if (!inventory) return null;
+  if (!inventory || !isDigitalInventory(inventory)) return null;
   const [deviceResources, advertiserResources] = await Promise.all([
     listMediaResources(deviceId),
     listInventoryAdvertiserResources(deviceId, asOf),
@@ -43,7 +44,7 @@ export function buildActiveDeviceMedia(
   asOf = currentDate(),
 ): ActiveDeviceMedia {
   const deviceItems = deviceResources
-    .filter((resource) => (resource.mediaType === "image" || resource.mediaType === "video") && supportedMimeTypes.has(resource.mimeType) && Boolean(resource.publicUrl))
+    .filter((resource) => resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video") && supportedMimeTypes.has(resource.mimeType) && Boolean(resource.publicUrl))
     .map((resource) => ({
       id: resource.id,
       deviceId: inventory.id,

@@ -1,0 +1,172 @@
+.government-auth-page {
+  background: var(--workspace-nav);
+  grid-template-columns: minmax(0,1.05fr) minmax(420px,.75fr);
+  min-height: 100vh;
+  display: grid;
+}
+
+.government-auth-context {
+  color: #f6faf8;
+  background:
+    linear-gradient(90deg,#ffffff0a 1px,transparent 1px) 0 0/64px 64px,
+    linear-gradient(#ffffff0a 1px,transparent 1px) 0 0/64px 64px,
+    radial-gradient(700px 520px at 18% 12%,#356ca542,transparent 62%),
+    linear-gradient(145deg,var(--workspace-nav),#142936);
+  align-content: space-between;
+  gap: 52px;
+  min-width: 0;
+  padding: clamp(30px,5vw,72px);
+  display: grid;
+  position: relative;
+  overflow: hidden;
+}
+
+.government-auth-context::after {
+  content: "";
+  background: var(--workspace-green);
+  width: 6px;
+  height: 112px;
+  position: absolute;
+  inset: 0 auto auto 0;
+}
+
+.government-auth-brand,
+.government-auth-brand > div,
+.government-auth-capabilities > div,
+.government-auth-kicker {
+  align-items: center;
+  display: flex;
+}
+
+.government-auth-brand { gap: 13px; }
+.government-auth-brand > div { align-items: flex-start; flex-direction: column; gap: 2px; }
+.government-auth-brand small { color: #8fa5b3; text-transform: uppercase; letter-spacing: .12em; font-size: .62rem; font-weight: 800; }
+.government-auth-brand strong { font-size: 1rem; }
+
+.government-auth-emblem {
+  border: 1px solid #ffffff29;
+  background: #ffffff0d;
+  border-radius: 8px;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  display: grid;
+}
+
+.government-auth-emblem svg { color: #83b9e5; width: 20px; height: 20px; }
+.government-auth-intro { max-width: 760px; }
+.government-auth-kicker { color: #a9bac4; gap: 8px; text-transform: uppercase; letter-spacing: .09em; font-size: .67rem; font-weight: 800; }
+.government-auth-kicker > span { background: #5fd0a4; border-radius: 50%; width: 7px; height: 7px; box-shadow: 0 0 0 5px #5fd0a41c; }
+
+.government-auth-intro h1 {
+  max-width: 16ch;
+  margin: 18px 0 16px;
+  font-size: clamp(2.6rem,5.7vw,5.9rem);
+  line-height: .95;
+  letter-spacing: -.045em;
+}
+
+.government-auth-intro p { color: #c4d1d7; max-width: 62ch; margin: 0; font-size: clamp(.96rem,1.4vw,1.12rem); line-height: 1.65; }
+.government-auth-capabilities { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; display: grid; }
+.government-auth-capabilities > div { border-top: 1px solid #ffffff24; align-items: flex-start; gap: 10px; min-width: 0; padding-top: 13px; }
+.government-auth-capabilities svg { color: #81b9e6; flex: none; width: 18px; height: 18px; }
+.government-auth-capabilities span,
+.government-auth-capabilities strong,
+.government-auth-capabilities small { display: block; }
+.government-auth-capabilities strong { font-size: .78rem; }
+.government-auth-capabilities small { color: #90a3ad; margin-top: 3px; font-size: .67rem; line-height: 1.4; }
+.government-auth-boundary { color: #8fa2ac; border-left: 2px solid var(--workspace-amber); max-width: 74ch; margin: -28px 0 0; padding-left: 10px; font-size: .67rem; line-height: 1.45; }
+
+.government-auth-form-panel {
+  background: #f7f9fa;
+  align-content: center;
+  gap: 22px;
+  min-width: 0;
+  padding: clamp(28px,5vw,72px);
+  display: grid;
+}
+
+.government-auth-form-copy { gap: 8px; max-width: 480px; display: grid; }
+.government-auth-form-copy h2 { margin: 0; font-size: clamp(1.85rem,3vw,2.7rem); line-height: 1.04; }
+.government-auth-form-copy p,
+.government-auth-help p { color: var(--muted); margin: 0; line-height: 1.5; }
+.government-auth-form { max-width: 480px; gap: 8px; }
+.government-auth-form .secret-field { margin-top: 5px; }
+.government-signin-button {
+  color: #fff;
+  background: var(--workspace-green);
+  border: 1px solid var(--workspace-green);
+  border-radius: 7px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  padding: 0 18px;
+  font-weight: 800;
+  display: inline-flex;
+  transition: background .14s,border-color .14s,box-shadow .14s,transform .14s;
+}
+
+.government-signin-button:hover:not(:disabled) { background: var(--green-dark); border-color: var(--green-dark); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.government-signin-button:active:not(:disabled) { transform: translateY(0); }
+.government-auth-help { border-top: 1px solid var(--line); gap: 7px; max-width: 480px; padding-top: 18px; font-size: .78rem; display: grid; }
+.government-auth-help-links { flex-wrap: wrap; gap: 7px 16px; display: flex; }
+.government-auth-help a { color: var(--blue); width: fit-content; font-weight: 800; }
+.government-auth-help a:hover { text-decoration: underline; }
+
+@media (max-width: 980px) {
+  .government-auth-page { grid-template-columns: 1fr; }
+  .government-auth-context { gap: 32px; min-height: auto; padding: 30px; }
+  .government-auth-intro h1 { max-width: 18ch; font-size: clamp(2.4rem,8vw,4.4rem); }
+  .government-auth-boundary { margin: 0; }
+  .government-auth-form-panel { padding: 38px 30px 48px; }
+}
+
+@media (max-width: 620px) {
+  .government-auth-context,
+  .government-auth-form-panel { padding-inline: 20px; }
+  .government-auth-context { gap: 26px; }
+  .government-auth-intro h1 { font-size: clamp(2.25rem,12vw,3.5rem); }
+  .government-auth-capabilities { grid-template-columns: 1fr; }
+  .government-auth-capabilities > div { min-height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .government-auth-page * { scroll-behavior: auto; }
+}
+
+.government-denied-page {
+  background:
+    linear-gradient(90deg,#ffffff0a 1px,transparent 1px) 0 0/64px 64px,
+    linear-gradient(#ffffff0a 1px,transparent 1px) 0 0/64px 64px,
+    var(--workspace-nav);
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+}
+
+.government-denied-panel {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  gap: 12px;
+  width: min(560px,100%);
+  padding: clamp(24px,5vw,44px);
+  display: grid;
+}
+
+.government-denied-icon { color: var(--workspace-blue); background: var(--soft-blue); border-radius: 8px; place-items: center; width: 44px; height: 44px; display: grid; }
+.government-denied-icon svg { width: 21px; height: 21px; }
+.government-denied-panel h1 { margin: 2px 0 0; font-size: clamp(1.9rem,5vw,3rem); line-height: 1.02; }
+.government-denied-panel p { color: var(--muted); margin: 0; line-height: 1.55; }
+.government-denied-actions { align-items: center; gap: 9px; margin-top: 8px; display: flex; flex-wrap: wrap; }
+.government-denied-actions form { margin: 0; }
+.government-denied-actions .primary-button,
+.government-denied-actions .ghost-button { border-radius: 7px; justify-content: center; align-items: center; min-height: 42px; padding: 0 15px; font-weight: 800; display: inline-flex; }
+.government-denied-actions .primary-button { color: #fff; background: var(--workspace-green); border: 1px solid var(--workspace-green); }
+.government-denied-actions .ghost-button { color: var(--workspace-ink); background: #fff; border: 1px solid var(--workspace-line-strong); }
+.government-denied-actions .primary-button:hover { background: var(--green-dark); border-color: var(--green-dark); }
+.government-denied-actions .ghost-button:hover { background: #f4f7f7; border-color: #aebbc0; }

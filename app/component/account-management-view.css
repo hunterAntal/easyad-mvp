@@ -39,6 +39,44 @@
   display: grid;
 }
 
+.account-search-field {
+  gap: 5px;
+  display: grid;
+}
+
+.account-search-control {
+  position: relative;
+}
+
+.account-search-control input {
+  padding-inline-end: 40px;
+}
+
+.account-search-control button {
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+}
+
+.account-search-control button:hover {
+  color: var(--ink);
+  background: var(--soft-green);
+}
+
+.account-search-control svg {
+  width: 16px;
+  height: 16px;
+}
+
 .account-filters small {
   color: var(--muted);
   grid-column: 1/-1;
@@ -97,6 +135,17 @@
   gap: 5px;
   font-size: .82rem;
   display: grid;
+}
+
+.account-role-help {
+  color: var(--muted);
+  background: var(--soft-blue);
+  border-inline-start: 3px solid var(--blue);
+  border-radius: 5px;
+  margin: 0;
+  padding: 9px 10px;
+  font-size: .78rem;
+  line-height: 1.45;
 }
 
 .account-identity {
@@ -159,8 +208,12 @@
   display: grid;
 }
 
-.account-upload-row:hover {
+a.account-upload-row:hover {
   border-color: var(--blue);
+}
+
+.account-upload-row.unavailable {
+  opacity: .68;
 }
 
 .account-upload-row img,

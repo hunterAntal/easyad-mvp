@@ -1,0 +1,28 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["app"],
+  "locale": "en-CA",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": [
+    "Table Selection",
+    "Select/Listbox",
+    "Date",
+    "Form",
+    "Scrollbar",
+    "Toast",
+    "CRUD"
+  ],
+  "ownership": {
+    "Select/Listbox": "native",
+    "Date": "native"
+  },
+  "requiredCommands": ["test", "build"],
+  "commands": {
+    "test": "npm test",
+    "build": "npm run build"
+  },
+  "evidence": {
+    "crudFullFlow": "tests/institution-network-view.test.tsx",
+    "failurePaths": "tests/institution-alerts-route.test.ts"
+  }
+}

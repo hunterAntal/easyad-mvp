@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ChatMessage, ChatRole } from "../../types";
 import { generateChatReply } from "../../lib/chatbot";
 import { isRateLimited } from "../../lib/rate-limit";
+import { normalizeLocale } from "../../i18n/config";
 
 const MAX_MESSAGES = 50;
 const MAX_CONTENT_LENGTH = 4000;
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A message is required" }, { status: 400 });
   }
 
-  const reply = await generateChatReply(messages);
+  const reply = await generateChatReply(messages, normalizeLocale(body?.locale));
   return NextResponse.json({ message: reply });
 }
 

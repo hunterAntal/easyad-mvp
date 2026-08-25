@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { DeviceMediaSlide } from "../../component/device-media-carousel";
 import DeviceScreen from "../../component/device-screen";
 import { resolveDeviceTemplate } from "../../component/device-templates";
-import { getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../../lib/db";
+import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../../lib/db";
+import { isDigitalInventory } from "../../lib/inventory-delivery";
+import { translate } from "../../i18n/messages";
 
 type DevicePublicPageProps = {
   params: Promise<{ id: string }>;
@@ -18,18 +20,21 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
   const { id } = await params;
   const query = (await searchParams) ?? {};
   const inventory = await getPublishedInventory(id);
-  if (!inventory) notFound();
+  if (!inventory || !isDigitalInventory(inventory)) notFound();
+  const displayLanguage = inventory.displayLanguage ?? "en";
+  const t = (message: string) => translate(displayLanguage, message);
 
   const templateParam = Array.isArray(query.template) ? query.template[0] : query.template;
   const template = resolveDeviceTemplate(templateParam, inventory.displayTemplate);
   const city = deriveCity(inventory.address);
+  const activeAlert = await getActiveDeviceAlertForDevice(inventory.id);
 
   const deviceSlides: DeviceMediaSlide[] = (await listMediaResources(id))
-    .filter((resource) => resource.mediaType === "image" || resource.mediaType === "video")
+    .filter((resource) => resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video"))
     .map((resource) => ({
       id: resource.id,
       title: resource.title,
-      subtitle: `${resource.mediaType} - ${resource.originalName}`,
+      subtitle: `${t(resource.mediaType)} - ${resource.originalName}`,
       mediaType: resource.mediaType === "video" ? "video" : "image",
       publicUrl: resource.publicUrl,
       createdAt: resource.createdAt,
@@ -40,7 +45,7 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
     .map((resource) => ({
       id: resource.id,
       title: resource.campaign,
-      subtitle: `Advertiser creative - ${resource.advertiser} - ${resource.originalName ?? "uploaded media"}`,
+      subtitle: `${t("Advertiser creative")} - ${resource.advertiser} - ${resource.originalName ?? t("uploaded media")}`,
       mediaType: resource.mimeType?.startsWith("video/") ? "video" : "image",
       publicUrl: resource.publicUrl ?? "",
       createdAt: resource.createdAt,
@@ -50,12 +55,13 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
 
   return (
     <DeviceScreen
-      deviceId={inventory.id}
       inventoryName={inventory.name}
       city={city}
       imageInterval={inventory.imageInterval}
       slides={slides}
       template={template}
+      displayLanguage={displayLanguage}
+      activeAlert={activeAlert}
     />
   );
 }

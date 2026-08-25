@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import type { InventoryItem } from "../app/data";
@@ -87,10 +87,11 @@ test("inventory edits wait for Save changes", async () => {
 
   await user.clear(screen.getByLabelText("Name"));
   await user.type(screen.getByLabelText("Name"), "Edited Device");
+  await user.selectOptions(screen.getByLabelText("Device display language"), "fr");
   expect(saveInventory).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Save changes" }));
-  expect(saveInventory).toHaveBeenCalledWith(expect.objectContaining({ id: item.id, name: "Edited Device" }));
+  expect(saveInventory).toHaveBeenCalledWith(expect.objectContaining({ id: item.id, name: "Edited Device", displayLanguage: "fr" }));
 });
 
 test("empty inventory hides record and media forms until a device draft is started", async () => {
@@ -121,4 +122,68 @@ test("empty inventory hides record and media forms until a device draft is start
   await user.click(screen.getByRole("button", { name: "Add device" }));
   expect(screen.getByLabelText("Name")).toBeInTheDocument();
   expect(screen.getByText("Images and videos")).toBeInTheDocument();
+});
+
+test("public device links are available only for digital inventory", () => {
+  const props = {
+    inventory: [item],
+    selectedId: item.id,
+    select: vi.fn(),
+    newItem: { ...item, id: "", name: "New Inventory Unit" },
+    mediaResources: [],
+    addInventory: vi.fn().mockResolvedValue(true),
+    deleteInventory: vi.fn(),
+    saveInventory: vi.fn().mockResolvedValue(true),
+    updateInventoryApproval: vi.fn(),
+    uploadMedia: vi.fn().mockResolvedValue(true),
+    deleteMediaResource: vi.fn().mockResolvedValue(undefined),
+    canManage: true,
+    canDelete: false,
+  };
+  const { rerender } = render(<InventoryView {...props} item={{ ...item, deliveryMode: "digital" }} />);
+
+  expect(screen.getByRole("link", { name: `/devices/${item.id}` })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: `/inventory/${item.id}` })).toBeInTheDocument();
+
+  const staticItem = { ...item, deliveryMode: "static" as const };
+  rerender(<InventoryView {...props} inventory={[staticItem]} item={staticItem} />);
+
+  expect(screen.queryByRole("link", { name: `/devices/${item.id}` })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: `/inventory/${item.id}` })).not.toBeInTheDocument();
+});
+
+test("a physical billboard exposes only date-derived Available or Unavailable status", () => {
+  const staticItem = {
+    ...item,
+    name: "Physical Billboard",
+    format: "static" as const,
+    deliveryMode: "static" as const,
+    availableFrom: "2000-01-01",
+    availableTo: "2001-01-01",
+    approvalStatus: "pending approval" as const,
+  };
+  render(
+    <InventoryView
+      inventory={[staticItem]}
+      selectedId={staticItem.id}
+      select={vi.fn()}
+      item={staticItem}
+      newItem={{ ...staticItem, id: "" }}
+      mediaResources={[]}
+      addInventory={vi.fn().mockResolvedValue(true)}
+      deleteInventory={vi.fn()}
+      saveInventory={vi.fn().mockResolvedValue(true)}
+      updateInventoryApproval={vi.fn()}
+      uploadMedia={vi.fn().mockResolvedValue(true)}
+      deleteMediaResource={vi.fn().mockResolvedValue(undefined)}
+      canManage
+      canDelete={false}
+    />,
+  );
+
+  expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
+  expect(screen.queryByText("pending approval")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Availability end"), { target: { value: "2099-01-01" } });
+  expect(screen.getByText("Physical billboard status: Available")).toBeInTheDocument();
 });

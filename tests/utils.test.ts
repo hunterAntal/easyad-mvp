@@ -111,6 +111,7 @@ test("map and location helpers normalize known spatial values", () => {
 
 test("creative validation accepts matching specs and rejects invalid output", () => {
   assert.equal(validateCreative(validCreative).every((check) => check.ok), true);
+  assert.equal(validateCreative({ ...validCreative, fileType: "gif" }).every((check) => check.ok), true);
 
   const invalid = validateCreative({
     ...validCreative,

@@ -342,9 +342,8 @@
   min-width: 0;
   font-size: .84rem;
   font-weight: 750;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
 .workspace-switcher-chevron {
@@ -595,6 +594,15 @@
   min-width: 220px;
 }
 
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: min(680px, 64%);
+  margin-left: auto;
+}
+
 .topbar .eyebrow {
   color: var(--workspace-green);
   margin: 0 0 4px;
@@ -613,6 +621,11 @@
   grid-template-columns: repeat(3,minmax(118px,1fr));
   gap: 8px;
   width: min(540px,56%);
+}
+
+.topbar-tools .metrics {
+  flex: 1 1 auto;
+  width: auto;
 }
 
 .topbar .metrics>div {
@@ -669,6 +682,11 @@
 .topbar .metrics {
   width: 100%;
 }
+
+.topbar-tools {
+  width: 100%;
+  margin-left: 0;
+}
 }
 
 @media (max-width:900px) {
@@ -722,12 +740,24 @@
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
+  scrollbar-color: #667b72 #17242c;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
   overscroll-behavior-x: contain;
 }
 
 .nav::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.nav::-webkit-scrollbar-track {
+  background: #17242c;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: #667b72;
+  border: 1px solid #17242c;
+  border-radius: 999px;
 }
 
 .nav-group {
@@ -774,6 +804,10 @@
   overflow: visible;
 }
 
+.topbar-tools {
+  align-items: flex-start;
+}
+
 .topbar .metrics>div {
   min-width: 0;
 }
@@ -786,6 +820,132 @@
   gap: 8px;
   padding: 10px 12px 8px;
 }
+
+}
+
+.government-shell {
+  background:
+    linear-gradient(90deg,#356ca508 1px,transparent 1px) 0 0/48px 48px,
+    var(--workspace-bg);
+}
+
+.government-sidebar {
+  background:
+    radial-gradient(320px 260px at 0 0,#356ca53d,transparent 68%),
+    linear-gradient(180deg,var(--workspace-nav),#132733);
+  border-right-color: #38505f;
+}
+
+.government-brand {
+  grid-template-columns: 42px minmax(0,1fr);
+  align-items: center;
+  gap: 11px;
+  min-height: 48px;
+  padding: 0 5px;
+  display: grid;
+}
+
+.government-brand-mark {
+  color: #ddebfa;
+  border: 1px solid #ffffff24;
+  background: #ffffff0c;
+  border-radius: 8px;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  position: relative;
+}
+
+.government-brand-mark svg { width: 20px; height: 20px; }
+.government-brand-mark i { background: #62d0a5; border: 2px solid var(--workspace-nav); border-radius: 50%; width: 9px; height: 9px; position: absolute; right: -2px; bottom: -2px; }
+.government-brand small,
+.government-brand strong,
+.government-brand > div > span { min-width: 0; display: block; }
+.government-brand small { color: #78909d; text-transform: uppercase; letter-spacing: .11em; font-size: .56rem; font-weight: 800; }
+.government-brand strong { color: #f5faf8; margin-top: 2px; font-size: .82rem; line-height: 1.1; }
+.government-brand > div > span { color: #8ea3ae; margin-top: 3px; font-size: .61rem; }
+
+.government-scope-card {
+  border: 1px solid #3a5361;
+  background: #ffffff09;
+  border-radius: 8px;
+  grid-template-columns: 32px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 60px;
+  padding: 9px;
+  display: grid;
+}
+
+.government-scope-card > span { color: #8fc2e9; background: #356ca52b; border-radius: 7px; place-items: center; width: 32px; height: 32px; display: grid; }
+.government-scope-card svg { width: 16px; height: 16px; }
+.government-scope-card small,
+.government-scope-card strong { display: block; }
+.government-scope-card small { color: #8297a2; text-transform: uppercase; font-size: .58rem; font-weight: 800; }
+.government-scope-card strong { color: #e9f2f5; margin-top: 3px; font-size: .72rem; line-height: 1.2; }
+
+.government-sidebar .nav a.active { background: linear-gradient(135deg,#356ca558,#187a5c35); }
+.government-sidebar .nav a.active svg { color: #8fc2e9; }
+.government-sidebar .nav-active-mark { background: #83bce8; box-shadow: 0 0 0 3px #83bce821; }
+
+.government-marketplace-link {
+  color: #9db0b9;
+  border-top: 1px solid #ffffff14;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 8px 10px 0;
+  font-size: .72rem;
+  font-weight: 700;
+  display: flex;
+}
+
+.government-marketplace-link:hover { color: #fff; }
+.government-marketplace-link svg { width: 16px; height: 16px; }
+
+.government-topbar {
+  background: #fffffff2;
+  border-bottom-color: #d5dfe4;
+}
+
+.government-topbar::before {
+  content: "";
+  background: linear-gradient(90deg,var(--workspace-blue),var(--workspace-green));
+  width: 100%;
+  height: 3px;
+  position: absolute;
+  inset: 0 0 auto;
+}
+
+.government-topbar { position: relative; }
+.government-topbar .eyebrow { color: var(--workspace-blue); }
+.government-session-status { border: 1px solid var(--workspace-line); background: #f8fafb; border-radius: 7px; grid-template-columns: 9px minmax(0,1fr); align-items: center; gap: 9px; min-width: 220px; padding: 9px 11px; display: grid; }
+.government-session-status > span { background: var(--workspace-green); border-radius: 50%; width: 8px; height: 8px; box-shadow: 0 0 0 4px #187a5c17; }
+.government-session-status strong,
+.government-session-status small { display: block; }
+.government-session-status strong { color: var(--workspace-ink); font-size: .72rem; }
+.government-session-status small { color: var(--workspace-muted); margin-top: 2px; font-size: .61rem; }
+
+@media (max-width:900px) {
+  .government-brand { min-width: 0; padding: 0; }
+  .government-scope-card { min-width: 0; min-height: 50px; }
+  .government-marketplace-link { display: none; }
+}
+
+@media (max-width:600px) {
+  .government-brand { grid-template-columns: 34px minmax(0,1fr); gap: 8px; }
+  .government-brand-mark { width: 34px; height: 34px; }
+  .government-brand span,
+  .government-scope-card small { display: none; }
+  .government-brand strong { font-size: .72rem; }
+  .government-scope-card { grid-template-columns: 28px minmax(0,1fr); min-height: 44px; padding: 6px; }
+  .government-scope-card > span { width: 28px; height: 28px; }
+  .government-scope-card strong { font-size: .64rem; }
+  .government-session-status { min-width: 0; width: 100%; }
+}
+
+@media (max-width:600px) {
 
 .sidebar .brand {
   min-width: 0;

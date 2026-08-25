@@ -79,6 +79,17 @@ const adminUser: DbUser = {
   createdAt: "2026-06-19T00:00:00.000Z",
 };
 
+const institutionUser: DbUser = {
+  id: "USR-CIVIC",
+  name: "Civic Media Group",
+  email: "ops@civic.example",
+  role: "institutional",
+  status: "active",
+  institutionId: null,
+  operatorLimit: 3,
+  createdAt: "2026-06-19T00:00:00.000Z",
+};
+
 describe("dashboard shell", () => {
   test("Topbar summarizes inventory and booking metrics", () => {
     render(<Topbar view="discover" visibleCount={2} inventory={inventory} bookings={bookings} />);
@@ -96,6 +107,14 @@ describe("dashboard shell", () => {
     expect(screen.queryByText("NaN%")).not.toBeInTheDocument();
   });
 
+  test("network control uses its scoped fleet summary instead of marketplace filter metrics", () => {
+    render(<Topbar view="network" visibleCount={0} inventory={inventory} bookings={bookings} />);
+
+    expect(screen.getByRole("heading", { name: "Public screen network control" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Workspace summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Matching units")).not.toBeInTheDocument();
+  });
+
   test("Sidebar lets admins switch role workspaces and updates the active view", async () => {
     const setRole = vi.fn();
     const setView = vi.fn();
@@ -104,13 +123,41 @@ describe("dashboard shell", () => {
     render(<Sidebar role="admin" view="reports" setRole={setRole} setView={setView} currentUser={adminUser} />);
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
-    expect(screen.getByText("admin@example.test - super admin")).toBeInTheDocument();
+    expect(screen.getByText("admin@example.test - Super Admin")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Screen control" })).toHaveAttribute("href", "/?role=admin&view=network");
 
     await user.click(workspace);
     expect(screen.getByRole("option", { name: "Super Admin" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("option", { name: "Institution account" })).toBeInTheDocument();
     await user.click(screen.getByRole("option", { name: "Operator" }));
 
     expect(setRole).toHaveBeenCalledWith("operator");
     expect(setView).toHaveBeenCalledWith("inventory");
+  });
+
+  test("government surface uses a dedicated civic shell while preserving shared navigation actions", () => {
+    const setView = vi.fn();
+    render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={setView} currentUser={institutionUser} surface="government" />);
+
+    expect(screen.getByText("Civic Screen Operations")).toBeInTheDocument();
+    expect(screen.getByText("Institution network")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Workspace" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Civic Screen Operations navigation" })).toBeInTheDocument();
+    const commandCentre = screen.getByRole("link", { name: "Command centre" });
+    expect(commandCentre).toHaveAttribute("href", "/government?view=network");
+    const screensLink = screen.getByRole("link", { name: "Screens" });
+    expect(screensLink).toHaveAttribute("href", "/government?view=inventory");
+    screensLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    screensLink.click();
+    expect(setView).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Open EasyAD Platform" })).toHaveAttribute("href", "/");
+    expect(document.querySelector('input[name="returnTo"]')).toHaveValue("/government/login");
+  });
+
+  test("government Topbar identifies the command centre session", () => {
+    render(<Topbar view="network" visibleCount={1} inventory={inventory} bookings={bookings} surface="government" />);
+
+    expect(screen.getByRole("heading", { name: "Screen network command centre" })).toBeInTheDocument();
+    expect(screen.getByText("Authenticated operating session")).toBeInTheDocument();
   });
 });

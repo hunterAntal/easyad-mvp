@@ -1,0 +1,214 @@
+/** @vitest-environment jsdom */
+
+import "@testing-library/jest-dom/vitest";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi } from "vitest";
+import type { DeviceAlert, InventoryItem } from "../app/data";
+import InstitutionNetworkView from "../app/component/institution-network-view";
+
+vi.mock("../app/component/maplibre-inventory-map", () => ({
+  default: () => <div data-testid="institution-fleet-map">Fleet map</div>,
+}));
+
+const published: InventoryItem = {
+  id: "INV-CIVIC-1",
+  name: "City Hall Screen",
+  operator: "Civic Communications",
+  format: "digital",
+  x: 50,
+  y: 50,
+  address: "100 Main Street, Thunder Bay, ON",
+  price: 0,
+  impressions: 10000,
+  traffic: 8000,
+  income: 70000,
+  audience: "Residents",
+  competitor: "Low",
+  occupancy: 20,
+  imageInterval: 8,
+  maxLoopSeconds: 120,
+  availableFrom: "2026-01-01",
+  availableTo: "2099-12-31",
+  approvalStatus: "approved",
+  institutionId: "INST-CIVIC",
+  displayTemplate: "fullscreen",
+};
+
+const unpublished: InventoryItem = {
+  ...published,
+  id: "INV-CIVIC-2",
+  name: "Library Screen",
+  address: "200 Library Lane, Thunder Bay, ON",
+  approvalStatus: "pending approval",
+};
+
+function renderWorkspace(overrides: Partial<React.ComponentProps<typeof InstitutionNetworkView>> = {}) {
+  const onSetPublishState = vi.fn(async (id: string, isPublished: boolean) => ({ value: { ...published, id, approvalStatus: isPublished ? "approved" as const : "pending approval" as const } }));
+  const onCreateAlert = vi.fn(async (draft) => ({ value: alertFromDraft(draft) }));
+  const props: React.ComponentProps<typeof InstitutionNetworkView> = {
+    institutionName: "City of Thunder Bay",
+    inventory: [published, unpublished],
+    mediaResources: [],
+    bookings: [],
+    creatives: [],
+    alerts: [],
+    selectedId: published.id,
+    onSelect: vi.fn(),
+    onOpenInventory: vi.fn(),
+    onUploadMedia: vi.fn(async () => ({ value: true as const })),
+    onSetPublishState,
+    onCreateAlert,
+    onEndAlert: vi.fn(async () => ({ error: "No alert selected" })),
+    ...overrides,
+  };
+  return { ...render(<InstitutionNetworkView {...props} />), onCreateAlert, onSetPublishState };
+}
+
+test("institution workspace combines the scoped fleet map with representative screen controls", () => {
+  renderWorkspace();
+
+  expect(screen.getByTestId("institution-fleet-map")).toBeInTheDocument();
+  expect(screen.getByText("Content preview, not a live camera feed")).toBeInTheDocument();
+  expect(screen.getByLabelText("City Hall Screen display preview")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Publish content" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create emergency override" })).toBeEnabled();
+  expect(screen.getByText("Screen delivery only")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Library Screen/ })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("link", { name: "Open device view" })).toHaveAttribute("href", `/devices/${published.id}`);
+});
+
+test("physical inventory never offers a standalone device view", () => {
+  const staticBillboard = { ...published, format: "static" as const, deliveryMode: "static" as const };
+  renderWorkspace({ inventory: [staticBillboard], selectedId: staticBillboard.id });
+
+  expect(screen.queryByRole("link", { name: "Open device view" })).not.toBeInTheDocument();
+  expect(screen.getByText("Device view unavailable")).toBeInTheDocument();
+});
+
+test("institution content publishes without entering an approval queue", async () => {
+  const user = userEvent.setup();
+  renderWorkspace();
+
+  await user.click(screen.getByRole("button", { name: "Publish content" }));
+  const dialog = await screen.findByRole("dialog", { name: "Publish screen content" });
+
+  expect(within(dialog).getByText("No approval required")).toBeInTheDocument();
+  expect(within(dialog).getByText("This content joins the live screen rotation after upload completes.")).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Publish content" })).toBeInTheDocument();
+});
+
+test("an institution with no devices gets a stable first-action empty state", () => {
+  renderWorkspace({ inventory: [], selectedId: "" });
+
+  expect(screen.getByRole("heading", { name: "No screens in this institution" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Add a device" })).toBeInTheDocument();
+  expect(screen.queryByTestId("institution-fleet-map")).not.toBeInTheDocument();
+});
+
+test("publishing state changes require explicit confirmation", async () => {
+  const user = userEvent.setup();
+  const { onSetPublishState } = renderWorkspace();
+
+  await user.click(screen.getByRole("button", { name: "Unpublish screen" }));
+  expect(onSetPublishState).not.toHaveBeenCalled();
+
+  const dialog = await screen.findByRole("dialog", { name: "Unpublish screen" });
+  await user.click(within(dialog).getByRole("button", { name: "Unpublish screen" }));
+
+  await waitFor(() => expect(onSetPublishState).toHaveBeenCalledWith(published.id, false));
+});
+
+test("authorized institution staff can compose a targeted AMBER screen override", async () => {
+  const user = userEvent.setup();
+  const { onCreateAlert } = renderWorkspace();
+
+  await user.click(screen.getByRole("button", { name: "Create emergency override" }));
+  await user.selectOptions(await screen.findByLabelText("Message type"), "amber");
+  await user.type(screen.getByLabelText("Alert headline"), "Missing child in River District");
+  await user.type(screen.getByLabelText("Area or location"), "River District");
+  await user.type(screen.getByLabelText("Instructions"), "Call emergency services with verified information.");
+  await user.click(screen.getByLabelText("I confirm that my agency has authorized this exact message and target scope."));
+  await user.click(screen.getByRole("button", { name: "Publish emergency override" }));
+
+  await waitFor(() => expect(onCreateAlert).toHaveBeenCalledWith(expect.objectContaining({
+    alertType: "amber",
+    title: "Missing child in River District",
+    targetDeviceIds: [published.id],
+  })));
+});
+
+test("Super Admin access scopes emergency targets to the selected institution", async () => {
+  const user = userEvent.setup();
+  const otherInstitutionScreen: InventoryItem = {
+    ...published,
+    id: "INV-OTHER-1",
+    name: "Regional Office Screen",
+    institutionId: "INST-OTHER",
+  };
+  renderWorkspace({
+    isSuperAdmin: true,
+    institutionName: "City of Thunder Bay",
+    inventory: [published, otherInstitutionScreen],
+  });
+
+  expect(screen.getByLabelText("All institution screen networks summary")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Create emergency override" }));
+  const dialog = await screen.findByRole("dialog", { name: "Create emergency screen override" });
+
+  expect(within(dialog).getByLabelText(/responsible agency has authorized/)).toBeInTheDocument();
+  expect(within(dialog).getByText("City Hall Screen")).toBeInTheDocument();
+  expect(within(dialog).queryByText("Regional Office Screen")).not.toBeInTheDocument();
+});
+
+test("a failed Super Admin override preserves the authorized draft for retry", async () => {
+  const user = userEvent.setup();
+  let resolveRequest!: (result: { error: string }) => void;
+  const onCreateAlert = vi.fn(() => new Promise<{ error: string }>((resolve) => { resolveRequest = resolve; }));
+  renderWorkspace({ isSuperAdmin: true, onCreateAlert });
+
+  await user.click(screen.getByRole("button", { name: "Create emergency override" }));
+  await user.type(screen.getByLabelText("Alert headline"), "Road closure");
+  await user.type(screen.getByLabelText("Area or location"), "Water Street");
+  await user.type(screen.getByLabelText("Instructions"), "Use the signed detour until the road reopens.");
+  await user.click(screen.getByLabelText(/responsible agency has authorized/));
+  await user.click(screen.getByRole("button", { name: "Publish emergency override" }));
+
+  await screen.findByRole("button", { name: "Publishing…" });
+  expect(screen.getByLabelText("Alert headline")).toHaveValue("Road closure");
+  expect(screen.getByLabelText(/responsible agency has authorized/)).toBeChecked();
+
+  await act(async () => resolveRequest({ error: "The alert service is temporarily unavailable." }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("temporarily unavailable");
+  expect(screen.getByLabelText("Alert headline")).toHaveValue("Road closure");
+  expect(screen.getByLabelText("Area or location")).toHaveValue("Water Street");
+  expect(screen.getByLabelText("Instructions")).toHaveValue("Use the signed detour until the road reopens.");
+  expect(screen.getByLabelText(/responsible agency has authorized/)).toBeChecked();
+});
+
+test("an incomplete emergency override stays in the dialog and focuses the first invalid field", async () => {
+  const user = userEvent.setup();
+  const { onCreateAlert } = renderWorkspace();
+
+  await user.click(screen.getByRole("button", { name: "Create emergency override" }));
+  await user.click(screen.getByLabelText("I confirm that my agency has authorized this exact message and target scope."));
+  await user.click(screen.getByRole("button", { name: "Publish emergency override" }));
+
+  expect(screen.getByRole("alert")).toHaveTextContent("Complete the message");
+  expect(screen.getByLabelText("Alert headline")).toHaveFocus();
+  expect(onCreateAlert).not.toHaveBeenCalled();
+});
+
+function alertFromDraft(draft: Parameters<React.ComponentProps<typeof InstitutionNetworkView>["onCreateAlert"]>[0]): DeviceAlert {
+  return {
+    id: "ALT-CIVIC-1",
+    institutionId: "INST-CIVIC",
+    ...draft,
+    status: "active",
+    issuedBy: "City of Thunder Bay",
+    createdBy: "INST-CIVIC",
+    createdAt: new Date().toISOString(),
+    endedAt: null,
+  };
+}

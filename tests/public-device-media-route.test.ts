@@ -56,6 +56,7 @@ const activeDevice = {
     availableFrom: "2026-01-01",
     availableTo: "2026-12-31",
     approvalStatus: "approved" as const,
+    displayLanguage: "fr" as const,
   },
   items: [videoItem, imageItem],
 };
@@ -96,6 +97,7 @@ test("public device collection returns totals and stable item links", async () =
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
   assert.deepEqual(body.summary, { total: 2, images: 1, videos: 1 });
+  assert.equal(body.device.displayLanguage, "fr");
   assert.equal(body.items[0].positionApiUrl, "http://localhost:3000/api/public/devices/INV-API-1/media/1");
   assert.equal(body.items[1].apiUrl, "http://localhost:3000/api/public/devices/INV-API-1/media/MED-API-IMAGE");
 });
@@ -105,6 +107,7 @@ test("public device item returns Base64 for images and URLs for video", async ()
     params: Promise.resolve({ id: "INV-API-1", media: "MED-API-IMAGE" }),
   });
   const imageBody = await imageResponse.json();
+  assert.equal(imageBody.device.displayLanguage, "fr");
   assert.equal(imageBody.content.encoding, "base64");
   assert.equal(Buffer.from(imageBody.content.data, "base64").toString("utf8").trim(), "public-api-image");
 

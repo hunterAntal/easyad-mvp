@@ -1,6 +1,8 @@
-# OOH Market MVP
+# EasyAD Platform
 
 Next.js MVP for a multi-tenant out-of-home advertising marketplace.
+
+The staged digital/static roadmap is in [Development Plan](docs/DEVELOPMENT_PLAN.md). Phase 0 architecture decisions are recorded in [ADR 0001](docs/adr/0001-campaign-placement-domain.md) and [ADR 0002](docs/adr/0002-lifecycle-transition-authority.md); unresolved policy stays explicit in [Product Decisions](docs/PRODUCT_DECISIONS.md).
 
 ## Local PostgreSQL Database
 
@@ -19,11 +21,13 @@ npm run dev
 
 `npm run init` installs dependencies, copies `.env.example` to `.env.local` when needed, starts the bundled PostgreSQL service with Docker Compose, and waits until the configured databases are reachable.
 
-Seed the temporary role accounts and operator-owned Thunder Bay devices for local testing:
+Seed the documented governmental, institutional, advertiser, and device fixtures for local development:
 
 ```bash
-npm run seed:test-data
+npm run seed:demo-data
 ```
+
+The stable identities, demo credentials, ownership graph, and AI fixture rules are documented in [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md). The older `seed:test-data` command remains available for the temporary test-account workflow.
 
 The local compose setup creates:
 
@@ -67,6 +71,16 @@ GET /api/public/devices/INV-101/media/CRV-123
 
 Image detail responses contain Base64 data. Video detail responses contain a public streaming URL. Append `?encoding=url` to an image detail request when a URL is preferred. Base64 responses default to a 20 MB limit, configurable with `PUBLIC_API_BASE64_MAX_BYTES` up to the platform's 50 MB upload limit.
 
+## Institutional and Local-Government Screen Control
+
+The public `/government/about` route introduces Civic Screen Operations for local government, institutions, and large screen networks before secure sign-in. A compact entry at the bottom of the marketplace landing page links to that overview; the government entry remains absent from the marketplace top navigation. The dedicated `Institution account` role then signs in through `/government/login` and uses the separate `/government` dashboard for devices owned by its institution. It combines publishing state, image/video uploads, a scoped fleet map, and a representative screen-content preview. Institution-owned uploads bypass content approval and join the rotation immediately when the screen is published; uploading content never silently publishes an intentionally unpublished screen. Delegated operator uploads remain in review until the owning Institution account or a Super Admin approves them. Advertiser creative keeps the standard campaign approval flow. The preview reflects only approved rotation content and is explicitly not a live camera feed. The persisted role key remains `institutional` for database compatibility.
+
+The public landing page links to this workspace from the middle of the page; it is intentionally absent from the top navigation. Signed-out visitors are routed to the dedicated government sign-in, while advertiser and operator accounts receive an access boundary. Super Admin can create Institution accounts and can enter the Civic Screen Operations dashboard in addition to the standard admin workspace.
+
+Authorized institutional staff can create time-limited AMBER, evacuation, or public-safety screen overrides for selected published devices. These overrides replace regular content only on the application's owned screens—they do not issue an alert through Alert Ready, wireless emergency alerts, police systems, or another official public-alert network.
+
+Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.
+
 ## Production Notes
 
 The production target is a stateless Next.js container on ECS Fargate, RDS PostgreSQL, and private S3 media storage. See [the AWS deployment runbook](docs/AWS_DEPLOYMENT.md) for the complete build, IAM, migration, health-check, and release procedure.
@@ -92,6 +106,12 @@ MEDIA_STORAGE_PROVIDER=s3
 MEDIA_BUCKET=<private-s3-bucket>
 MEDIA_KEY_PREFIX=production
 AWS_REGION=ca-central-1
+FEATURE_CAMPAIGN_MODEL_V2=false
+FEATURE_AGENCY_WORKSPACE=false
+FEATURE_STATIC_FULFILLMENT=false
+FEATURE_PAYMENTS=false
 ```
+
+Roadmap features are opt-in and accept only the exact value `true`. Payment collection is out of scope and `FEATURE_PAYMENTS` must remain `false` outside an explicitly labelled demo environment.
 
 The application retains a startup schema check, but production releases should run the explicit migration first. Local development uses `.data/uploads`; S3 is required for durable media across multiple Fargate tasks.

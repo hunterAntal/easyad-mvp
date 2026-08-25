@@ -2,6 +2,7 @@
 
 import "./device-widgets.css";
 import { useEffect, useState } from "react";
+import { useI18n } from "../i18n/client";
 
 // --- deterministic per-device helpers ------------------------------------------
 
@@ -65,6 +66,7 @@ function WeatherIcon({ condition, size = 40 }: { condition: ConditionKey; size?:
 // --- live clock ----------------------------------------------------------------
 
 export function DeviceClock({ city }: { city: string }) {
+  const { locale } = useI18n();
   const mounted = useMounted();
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -73,10 +75,10 @@ export function DeviceClock({ city }: { city: string }) {
     return () => window.clearInterval(timer);
   }, []);
   const time = mounted && now
-    ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? now.toLocaleTimeString(locale === "fr" ? "fr-CA" : "en-CA", { hour: "2-digit", minute: "2-digit" })
     : "--:--";
   const date = mounted && now
-    ? now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })
+    ? now.toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA", { weekday: "long", month: "short", day: "numeric" })
     : "";
   return (
     <div className="device-clock">
@@ -114,42 +116,43 @@ function buildForecast(seed: string) {
 }
 
 export function WeatherPanel({ city, seed, compact = false }: { city: string; seed: string; compact?: boolean }) {
+  const { t } = useI18n();
   const forecast = buildForecast(seed);
   if (compact) {
     return (
       <div className="weather-compact">
         <span className="weather-compact-icon"><WeatherIcon condition={forecast.current} size={34} /></span>
         <strong>{forecast.temp}&deg;</strong>
-        <span>{forecast.currentLabel}</span>
+        <span>{t(forecast.currentLabel)}</span>
       </div>
     );
   }
   return (
     <div className="weather-panel">
-      <span className="device-widget-eyebrow">Local weather</span>
+      <span className="device-widget-eyebrow">{t("Local weather")}</span>
       <div className="weather-now">
         <WeatherIcon condition={forecast.current} size={64} />
         <div>
           <strong>{forecast.temp}&deg;C</strong>
-          <span>{forecast.currentLabel}</span>
+          <span>{t(forecast.currentLabel)}</span>
         </div>
       </div>
       <div className="weather-meta">
-        <span>Feels {forecast.feels}&deg;</span>
-        <span>Humidity {forecast.humidity}%</span>
-        <span>Wind {forecast.wind} km/h</span>
+        <span>{t("Feels {count}°", { count: forecast.feels })}</span>
+        <span>{t("Humidity {count}%", { count: forecast.humidity })}</span>
+        <span>{t("Wind {count} km/h", { count: forecast.wind })}</span>
       </div>
       <div className="weather-forecast">
         {forecast.days.map((day) => (
           <div className="weather-day" key={day.label}>
-            <span>{day.label}</span>
+            <span>{t(day.label)}</span>
             <WeatherIcon condition={day.condition} size={30} />
             <strong>{day.hi}&deg;</strong>
             <small>{day.lo}&deg;</small>
           </div>
         ))}
       </div>
-      <span className="device-widget-source">{city} &middot; updated continuously</span>
+      <span className="device-widget-source">{city} &middot; {t("updated continuously")}</span>
     </div>
   );
 }
@@ -164,20 +167,21 @@ const civicNotices = [
 ];
 
 export function PublicInfoPanel({ city }: { city: string }) {
+  const { t } = useI18n();
   return (
     <div className="public-info-panel">
-      <span className="device-widget-eyebrow">Public information</span>
+      <span className="device-widget-eyebrow">{t("Public information")}</span>
       <div className="civic-notice-list">
         {civicNotices.map((notice) => (
           <div className="civic-notice" key={notice.title}>
-            <strong>{notice.title}</strong>
-            <span>{notice.body}</span>
+            <strong>{t(notice.title)}</strong>
+            <span>{t(notice.body)}</span>
           </div>
         ))}
       </div>
       <div className="civic-reserved" role="note">
-        <span className="device-widget-eyebrow">Reserved for local government</span>
-        <span>{city} municipal messaging space</span>
+        <span className="device-widget-eyebrow">{t("Reserved for local government")}</span>
+        <span>{t("{city} municipal messaging space", { city })}</span>
       </div>
     </div>
   );
@@ -199,6 +203,7 @@ function buildDepartures(seed: string) {
 }
 
 export function TransitPanel({ stopName, seed, ticker = false }: { stopName: string; seed: string; ticker?: boolean }) {
+  const { t } = useI18n();
   const mounted = useMounted();
   const [departures, setDepartures] = useState(() => buildDepartures(seed));
 
@@ -215,12 +220,12 @@ export function TransitPanel({ stopName, seed, ticker = false }: { stopName: str
 
   if (ticker) {
     return (
-      <div className="transit-ticker" aria-label={`Departures from ${stopName}`}>
-        <span className="transit-ticker-label">Next buses</span>
+      <div className="transit-ticker" aria-label={t("Departures from {name}", { name: stopName })}>
+        <span className="transit-ticker-label">{t("Next buses")}</span>
         <div className="transit-ticker-track">
           {departures.map((entry) => (
             <span className="transit-ticker-item" key={entry.route}>
-              <b>{entry.route}</b> {entry.dest} <em>{mounted ? `${entry.minutes} min` : "-- min"}</em>
+              <b>{entry.route}</b> {t(entry.dest)} <em>{mounted ? `${entry.minutes} min` : "-- min"}</em>
             </span>
           ))}
         </div>
@@ -230,13 +235,13 @@ export function TransitPanel({ stopName, seed, ticker = false }: { stopName: str
 
   return (
     <div className="transit-panel">
-      <span className="device-widget-eyebrow">Next departures</span>
+      <span className="device-widget-eyebrow">{t("Next departures")}</span>
       <span className="transit-stop">{stopName}</span>
       <div className="transit-list">
         {departures.map((entry) => (
           <div className="transit-row" key={entry.route}>
             <span className="transit-route">{entry.route}</span>
-            <span className="transit-dest">{entry.dest}</span>
+            <span className="transit-dest">{t(entry.dest)}</span>
             <span className="transit-eta">{mounted ? entry.minutes : "--"}<small>min</small></span>
           </div>
         ))}

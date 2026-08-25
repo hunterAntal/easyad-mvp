@@ -2,9 +2,24 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { InventoryItem, Role } from "../data";
+import { canAccessInstitutionWorkspace, roleValues } from "../roles";
 import { createSessionRecord, deleteSessionRecord, getUserBySession, type DbUser } from "./db";
 
 export const sessionCookie = "ooh_session";
+
+export function safeLocalReturnPath(value: string | null | undefined, allowedRoot?: string) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
+
+  try {
+    const localOrigin = new URL("https://local.invalid");
+    const resolved = new URL(value, localOrigin);
+    if (resolved.origin !== localOrigin.origin) return null;
+    if (allowedRoot && resolved.pathname !== allowedRoot && !resolved.pathname.startsWith(`${allowedRoot}/`)) return null;
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return null;
+  }
+}
 
 export function requestUrl(request: NextRequest, path: string) {
   const protocol = firstHeaderValue(request.headers.get("x-forwarded-proto"))
@@ -77,6 +92,21 @@ export function canManageInventoryRecord(user: DbUser | null, inventory: Invento
   return Boolean(institutionId && inventory.institutionId === institutionId);
 }
 
+export function canPublishInventoryRecord(user: DbUser | null, inventory: InventoryItem) {
+  if (user?.role === "admin") return true;
+  return user?.role === "institutional" && inventory.institutionId === user.id;
+}
+
+export function canDirectPublishInstitutionContent(user: DbUser | null, inventory: InventoryItem) {
+  if (!inventory.institutionId) return false;
+  if (user?.role === "admin") return true;
+  return user?.role === "institutional" && inventory.institutionId === user.id;
+}
+
+export function canManageInstitutionAlerts(user: DbUser | null) {
+  return canAccessInstitutionWorkspace(user?.role);
+}
+
 export function canBuyAds(user: DbUser | null) {
   return user?.role === "advertiser" || user?.role === "admin";
 }
@@ -94,7 +124,7 @@ export function canReadBooking(user: DbUser | null, bookingOwnerId: string | nul
 }
 
 export function isAllowedRole(value: string | null): value is Role {
-  return value === "advertiser" || value === "operator" || value === "institutional" || value === "admin";
+  return roleValues.includes(value as Role);
 }
 
 function firstHeaderValue(value: string | null) {

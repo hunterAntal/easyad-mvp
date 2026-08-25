@@ -95,7 +95,7 @@ function isFormat(value: unknown): value is FormatKey {
 }
 
 function isFileType(value: unknown): value is Creative["fileType"] {
-  return typeof value === "string" && ["png", "jpg", "pdf", "mp4"].includes(value);
+  return typeof value === "string" && ["png", "jpg", "gif", "pdf", "mp4"].includes(value);
 }
 
 function cleanNumber(value: unknown, fallback: number) {
@@ -107,8 +107,8 @@ async function readUploadSubmission(request: NextRequest) {
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File)) return { error: "A creative image or video file is required", status: 400 as const };
-  const upload = await inspectMediaUpload(file, ["png", "jpg", "mp4"]);
-  if (!upload) return { error: "Creative uploads support valid PNG, JPEG, or MP4 files up to 50 MB", status: 400 as const };
+  const upload = await inspectMediaUpload(file, ["png", "jpg", "gif", "mp4"]);
+  if (!upload) return { error: "Creative uploads support valid PNG, JPEG, GIF, or MP4 files up to 50 MB", status: 400 as const };
   return {
     ...upload,
     originalName: file.name,

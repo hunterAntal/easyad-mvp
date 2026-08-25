@@ -33,7 +33,7 @@ export type CreativeDraft = {
   format: FormatKey;
   width: number;
   height: number;
-  fileType: "png" | "jpg" | "pdf" | "mp4";
+  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4";
   fileSize: number;
   safeZone: number;
   distortion: number;

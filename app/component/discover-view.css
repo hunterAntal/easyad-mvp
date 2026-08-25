@@ -52,6 +52,12 @@
   font-size: .78rem;
 }
 
+.inventory-card > .status {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
 .card-meta,
 .card-stats {
   justify-content: space-between;

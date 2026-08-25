@@ -3,6 +3,7 @@ import { Transaction } from "../../../../data";
 import { canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
 import { getBooking, getInventory, getTransactionByBooking, updateBookingRecord, upsertTransaction } from "../../../../lib/db";
 import { processCharge, processRefund } from "../../../../lib/payments";
+import { isFeatureEnabled } from "../../../../lib/feature-flags";
 import { splitRevenue } from "../../../../utils";
 
 type RouteContext = {
@@ -12,6 +13,10 @@ type RouteContext = {
 // Settle or refund an invoice through the (mock) payment gateway and persist
 // the resulting transaction plus the booking's paid flag.
 export async function POST(request: NextRequest, context: RouteContext) {
+  if (!isFeatureEnabled("payments")) {
+    return NextResponse.json({ error: "Payment collection is not available" }, { status: 404 });
+  }
+
   const user = await getCurrentUser();
   if (!user || !canManageInventory(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 

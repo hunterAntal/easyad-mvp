@@ -1,0 +1,5 @@
+import { NextRequest,NextResponse } from "next/server";
+import { getCurrentUser } from "../../../lib/auth";
+import { getDb } from "../../../lib/db";
+import { organizationIdsForUser } from "../../../lib/campaigns";
+export async function GET(request:NextRequest){const user=await getCurrentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});const orgs=await organizationIdsForUser(user);const days=Math.min(365,Math.max(1,Number(request.nextUrl.searchParams.get("days")??30)));const since=new Date(Date.now()-days*86400000).toISOString();const events=await getDb().query<{action:string;count:string}>("SELECT action,COUNT(*) count FROM activity_events WHERE organization_id=ANY($1::text[]) AND created_at>=$2 GROUP BY action ORDER BY count DESC",[orgs,since]);const campaignStates=await getDb().query<{status:string;count:string}>("SELECT status,COUNT(*) count FROM campaigns WHERE organization_id=ANY($1::text[]) GROUP BY status ORDER BY status",[orgs]);return NextResponse.json({days,events:events.rows.map(row=>({...row,count:Number(row.count)})),campaignStates:campaignStates.rows.map(row=>({...row,count:Number(row.count)}))});}

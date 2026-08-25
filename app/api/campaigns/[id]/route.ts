@@ -1,0 +1,7 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "../../../lib/auth";
+import { CampaignError, getCampaignDetail, mutateCampaignPlan, transitionCampaign } from "../../../lib/campaigns";
+import { isFeatureEnabled } from "../../../lib/feature-flags";
+type Context={params:Promise<{id:string}>};
+export async function GET(_request:NextRequest,context:Context){if(!isFeatureEnabled("campaign_model_v2"))return NextResponse.json({error:"Not available"},{status:404});const user=await getCurrentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});const detail=await getCampaignDetail(user,(await context.params).id);return detail?NextResponse.json(detail,{headers:{ETag:`"campaign-${detail.campaign.version}"`}}):NextResponse.json({error:"Campaign not found"},{status:404});}
+export async function PATCH(request:NextRequest,context:Context){if(!isFeatureEnabled("campaign_model_v2"))return NextResponse.json({error:"Not available"},{status:404});const user=await getCurrentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});try{const body=await request.json();const id=(await context.params).id;return NextResponse.json(["operator_confirm","accept_offline"].includes(body.action)?await transitionCampaign(user,id,body):await mutateCampaignPlan(user,id,body));}catch(error){return error instanceof CampaignError?NextResponse.json({error:error.message},{status:error.status}):NextResponse.json({error:"Campaign operation failed"},{status:500});}}

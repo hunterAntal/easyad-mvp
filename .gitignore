@@ -27,6 +27,7 @@ blob-report/
 .data/
 uploads/
 TEMP_ACCOUNTS.txt
+DEMO_ACCOUNTS.md
 
 # Logs
 logs/

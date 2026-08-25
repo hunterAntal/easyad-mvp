@@ -2,6 +2,7 @@
 
 import "./toast.css";
 import { useEffect, useState } from "react";
+import { useI18n } from "../i18n/client";
 
 export type ToastTone = "success" | "error" | "info";
 type ToastEntry = { id: number; tone: ToastTone; message: string };
@@ -46,6 +47,7 @@ function ToastIcon({ tone }: { tone: ToastTone }) {
 }
 
 export function Toaster() {
+  const { t } = useI18n();
   const [, force] = useState(0);
   useEffect(() => {
     const listener = () => force((value) => value + 1);
@@ -57,12 +59,12 @@ export function Toaster() {
 
   if (!entries.length) return null;
   return (
-    <div className="toast-viewport" role="region" aria-live="polite" aria-label="Notifications">
+    <div className="toast-viewport" role="region" aria-live="polite" aria-label={t("Notifications")}>
       {entries.map((entry) => (
         <div key={entry.id} className={`toast toast-${entry.tone}`} role="status">
           <span className="toast-icon"><ToastIcon tone={entry.tone} /></span>
-          <span className="toast-msg">{entry.message}</span>
-          <button type="button" className="toast-close" aria-label="Dismiss notification" onClick={() => dismissToast(entry.id)}>&times;</button>
+          <span className="toast-msg">{t(entry.message)}</span>
+          <button type="button" className="toast-close" aria-label={t("Dismiss notification")} onClick={() => dismissToast(entry.id)}>&times;</button>
         </div>
       ))}
     </div>

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     device: {
       id: result.inventory.id,
       name: result.inventory.name,
+      displayLanguage: result.inventory.displayLanguage ?? "en",
       imageIntervalSeconds: result.inventory.imageInterval,
       totalMedia: result.items.length,
       totalImages: result.items.filter((entry) => entry.mediaType === "image").length,

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       address: result.inventory.address,
       format: result.inventory.format,
       displayTemplate: result.inventory.displayTemplate ?? "fullscreen",
+      displayLanguage: result.inventory.displayLanguage ?? "en",
       imageIntervalSeconds: result.inventory.imageInterval,
       links: {
         api: absoluteRequestUrl(request, devicePath),

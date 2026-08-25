@@ -1,0 +1,79 @@
+/* Public inventory API reference. This is intentionally absent from the playback-only device route. */
+
+.device-api-guide {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+  padding: 14px 16px;
+  border: 1px solid #2d443c;
+  border-radius: var(--radius-sm);
+  color: #f5faf7;
+  background: #07100d;
+  box-shadow: 0 12px 28px #17202a24;
+}
+
+.device-api-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.device-api-heading span {
+  color: #6ee0b4;
+  font-size: .68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.device-api-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-api-heading small {
+  color: #b8c8c1;
+  font-size: .72rem;
+}
+
+.device-api-guide code {
+  display: block;
+  overflow: hidden;
+  color: #dce9e4;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: clamp(.7rem,1vw,.8rem);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-api-guide a {
+  padding: 7px 9px;
+  border: 1px solid #ffffff1f;
+  border-radius: 5px;
+  background: #ffffff0d;
+}
+
+.device-api-guide a:hover,
+.device-api-guide a:focus-visible {
+  border-color: #6ee0b480;
+  background: #6ee0b414;
+  outline: none;
+}
+
+@media (max-width:700px) {
+  .device-api-guide {
+    padding: 12px;
+  }
+
+  .device-api-heading {
+    grid-template-columns: auto minmax(0,1fr);
+  }
+
+  .device-api-heading small {
+    display: none;
+  }
+}

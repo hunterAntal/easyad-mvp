@@ -1,18 +1,31 @@
 "use client";
 
 import "./chatbot.css";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../types";
 import { toast } from "./toast";
+import { useI18n } from "../i18n/client";
 
-const greeting: ChatMessage = {
-  role: "assistant",
-  content: "Hi! I'm the OOH Market assistant. Ask me anything about discovering inventory, booking, or reporting.",
-};
+const devicePagePrefixes = ["/devices", "/inventory"] as const;
+
+export function isDevicePage(pathname: string | null) {
+  return devicePagePrefixes.some((prefix) => pathname === prefix || pathname?.startsWith(`${prefix}/`));
+}
 
 export default function Chatbot() {
+  const pathname = usePathname();
+
+  if (isDevicePage(pathname)) return null;
+
+  return <ChatbotWidget />;
+}
+
+function ChatbotWidget() {
+  const { locale, t } = useI18n();
+  const greeting = t("Hi! I'm the EasyAD Platform assistant. Ask me anything about discovering inventory, booking, or reporting.");
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([greeting]);
+  const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: greeting }]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -24,6 +37,10 @@ export default function Chatbot() {
       inputRef.current?.focus();
     }
   }, [messages, open]);
+
+  useEffect(() => {
+    setMessages((current) => current.length === 1 && current[0]?.role === "assistant" ? [{ role: "assistant", content: greeting }] : current);
+  }, [greeting]);
 
   async function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,7 +54,7 @@ export default function Chatbot() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({ messages: nextMessages, locale }),
       });
       if (!response.ok) throw new Error("The assistant is unavailable right now.");
       const payload = await response.json() as { message: ChatMessage };
@@ -54,7 +71,7 @@ export default function Chatbot() {
       <button
         type="button"
         className={`chatbot-launcher${open ? " is-open" : ""}`}
-        aria-label={open ? "Close assistant" : "Open assistant"}
+        aria-label={t(open ? "Close assistant" : "Open assistant")}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -66,13 +83,13 @@ export default function Chatbot() {
       </button>
 
       {open ? (
-        <section className="chatbot-panel" role="dialog" aria-label="Site assistant">
+        <section className="chatbot-panel" role="dialog" aria-label={t("Site assistant")}>
           <header className="chatbot-header">
             <div>
-              <strong>Assistant</strong>
-              <span>Here to help</span>
+              <strong>{t("Assistant")}</strong>
+              <span>{t("Here to help")}</span>
             </div>
-            <button type="button" className="chatbot-close" aria-label="Close assistant" onClick={() => setOpen(false)}>&times;</button>
+            <button type="button" className="chatbot-close" aria-label={t("Close assistant")} onClick={() => setOpen(false)}>&times;</button>
           </header>
           <div className="chatbot-messages" ref={listRef}>
             {messages.map((message, index) => (
@@ -82,17 +99,17 @@ export default function Chatbot() {
               <div className="chatbot-msg assistant pending"><span className="async-spinner" /></div>
             ) : null}
           </div>
-          <form className="chatbot-input" onSubmit={send}>
+          <form className="chatbot-input" noValidate onSubmit={send}>
             <input
               ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Type a message..."
-              aria-label="Message the assistant"
+              placeholder={t("Type a message...")}
+              aria-label={t("Message the assistant")}
               disabled={sending}
               maxLength={4000}
             />
-            <button type="submit" className="primary-button" disabled={sending || !input.trim()} aria-label="Send message">
+            <button type="submit" className="primary-button" disabled={sending || !input.trim()} aria-label={t("Send message")}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8z" /></svg>
             </button>
           </form>

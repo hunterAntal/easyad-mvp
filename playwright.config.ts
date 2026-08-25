@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(process.cwd());
+if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 const e2eDatabaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -17,7 +21,10 @@ export default defineConfig({
     url: "http://localhost:3100",
     reuseExistingServer: true,
     timeout: 120_000,
-    env: e2eDatabaseUrl ? { DATABASE_URL: e2eDatabaseUrl } : undefined,
+    env: {
+      ...(e2eDatabaseUrl ? { DATABASE_URL: e2eDatabaseUrl } : {}),
+      APP_ORIGIN: "http://localhost:3100",
+    },
   },
   projects: [
     {

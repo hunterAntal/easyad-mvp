@@ -1,12 +1,15 @@
 import OohApp from "./ooh-app";
 import { FormatKey, Role, View, formats, locations } from "./data";
 import { getCurrentUser, getInstitutionScope } from "./lib/auth";
-import { ensureBookingTransactions, listApprovalEvents, listApprovalEventsForInstitution, listBookings, listBookingsCreatedBy, listBookingsForInstitution, listCreatives, listInventory, listInventoryByInstitution, listInstitutionOperators, listMediaResources, listMediaResourcesForInstitution, listNonAdminUsers, listPublishedInventory, listTransactions, listTransactionsCreatedBy, listTransactionsForInstitution } from "./lib/db";
+import { ensureBookingTransactions, listApprovalEvents, listApprovalEventsForInstitution, listBookings, listBookingsCreatedBy, listBookingsForInstitution, listCreatives, listDeviceAlerts, listInventory, listInventoryByInstitution, listInstitutionOperators, listMediaResources, listMediaResourcesForInstitution, listNonAdminUsers, listPublishedInventory, listTransactions, listTransactionsCreatedBy, listTransactionsForInstitution } from "./lib/db";
 import type { CreativeDraft, Filters } from "./types";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import TorontoStarter from "./component/toronto-starter";
 import { INTRO_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
+import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
+import GovernmentAccessDenied from "./component/government-access-denied";
+import { getFeatureFlags } from "./lib/feature-flags";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -14,45 +17,50 @@ type PageProps = {
 
 export const dynamic = "force-dynamic";
 
-const roles: Role[] = ["advertiser", "operator", "institutional", "admin"];
-const views: View[] = ["portal", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+const views: View[] = ["portal", "network", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
 const templates: CreativeDraft["template"][] = ["retail", "finance", "event"];
-const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "pdf", "mp4"];
+const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "gif", "pdf", "mp4"];
 const filterFormats: Filters["format"][] = ["all", "digital", "static", "transit"];
 const competitors: Filters["competitor"][] = ["all", "Low", "Medium", "High"];
-const roleDefaultView: Record<Role, View> = {
-  advertiser: "discover",
-  operator: "inventory",
-  institutional: "inventory",
-  admin: "reports",
-};
 const roleAllowedViews: Record<Role, View[]> = {
   advertiser: ["portal", "discover", "booking", "campaigns", "creative", "resources", "reports", "billing"],
   operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing"],
-  institutional: ["portal", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
+  institutional: ["portal", "network", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
   admin: views,
 };
+const governmentViews: View[] = ["network", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
 
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
+  const surface = readOne(params.__surface) === "government" ? "government" : "marketplace";
+  const isGovernmentSurface = surface === "government";
   const user = await getCurrentUser();
   const role = readOne(params.role);
   const view = readOne(params.view);
-  const requestedRole = isRole(role) ? role : user?.role;
-  const requestedView = isView(view) ? view : "portal";
+  const requestedRole = isGovernmentSurface ? user?.role : isRole(role) ? role : user?.role;
+  const requestedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
   const cookieStore = await cookies();
-  const showStarter = shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
+  const showStarter = !isGovernmentSurface && shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
 
-  if (!user && requestedView !== "portal") {
-    redirect(`/login?returnTo=${encodeURIComponent(queryFromParams(params))}`);
+  if (!user && (isGovernmentSurface || requestedView !== "portal")) {
+    const destination = isGovernmentSurface ? governmentPathFromParams(params) : queryFromParams(params);
+    redirect(`${isGovernmentSurface ? "/government/login" : "/login"}?returnTo=${encodeURIComponent(destination)}`);
+  }
+
+  if (isGovernmentSurface && user && !canAccessInstitutionWorkspace(user.role)) {
+    return <GovernmentAccessDenied currentRole={user.role} />;
+  }
+
+  if (!isGovernmentSurface && user?.role === "institutional" && requestedView !== "portal") {
+    redirect(`/government?view=${governmentViews.includes(requestedView) ? requestedView : "network"}`);
   }
 
   const effectiveRole = !user ? "advertiser" : user.role === "admin" ? requestedRole ?? "admin" : user.role;
-  const allowedViews = roleAllowedViews[effectiveRole];
-  const effectiveView = allowedViews.includes(requestedView) ? requestedView : roleDefaultView[effectiveRole];
+  const allowedViews = isGovernmentSurface ? governmentViews : roleAllowedViews[effectiveRole];
+  const effectiveView = allowedViews.includes(requestedView) ? requestedView : isGovernmentSurface ? "network" : roleWorkspaceView[effectiveRole];
 
   if (user && (requestedRole !== effectiveRole || requestedView !== effectiveView)) {
-    redirect(`/?role=${effectiveRole}&view=${effectiveView}`);
+    redirect(isGovernmentSurface ? `/government?view=${effectiveView}` : `/?role=${effectiveRole}&view=${effectiveView}`);
   }
 
   const institutionId = getInstitutionScope(user);
@@ -60,6 +68,7 @@ export default async function Page({ searchParams }: PageProps) {
   const inventory = user?.role === "admin" ? await listInventory() : institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory();
   const bookings = !user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listBookingsCreatedBy(user.id) : institutionId ? await listBookingsForInstitution(institutionId) : await listBookings();
   const mediaResources = user?.role === "admin" ? await listMediaResources() : institutionId ? await listMediaResourcesForInstitution(institutionId) : [];
+  const deviceAlerts = user?.role === "admin" ? await listDeviceAlerts() : user?.role === "institutional" ? await listDeviceAlerts(user.id) : [];
   if (user?.role === "admin" || institutionId) await ensureBookingTransactions();
   const transactions = !user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listTransactionsCreatedBy(user.id) : institutionId ? await listTransactionsForInstitution(institutionId) : await listTransactions();
   const approvalHistory = user?.role === "admin" ? await listApprovalEvents() : institutionId ? await listApprovalEventsForInstitution(institutionId) : [];
@@ -90,6 +99,7 @@ export default async function Page({ searchParams }: PageProps) {
         initialInventoryData={inventory}
         initialBookingsData={bookings}
         initialMediaResources={mediaResources}
+        initialDeviceAlerts={deviceAlerts}
         initialTransactions={transactions}
         initialApprovalHistory={approvalHistory}
         initialCreatives={creatives}
@@ -116,6 +126,8 @@ export default async function Page({ searchParams }: PageProps) {
         }}
         initialBookingId={bookingId}
         initialCreativeSubmitted={readOne(params.submitted) === "creative"}
+        featureFlags={getFeatureFlags()}
+        surface={surface}
         initialCreative={{
           template: isTemplate(template) ? template : undefined,
           format: isFormat(creativeFormat) ? creativeFormat : undefined,
@@ -138,6 +150,7 @@ function readOne(value: string | string[] | undefined) {
 function queryFromParams(params: Record<string, string | string[] | undefined>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
+    if (key.startsWith("__")) continue;
     if (Array.isArray(value)) {
       for (const entry of value) search.append(key, entry);
     } else if (value !== undefined) {
@@ -148,8 +161,22 @@ function queryFromParams(params: Record<string, string | string[] | undefined>) 
   return query ? `/?${query}` : "/";
 }
 
+function governmentPathFromParams(params: Record<string, string | string[] | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "role" || key.startsWith("__")) continue;
+    if (Array.isArray(value)) {
+      for (const entry of value) search.append(key, entry);
+    } else if (value !== undefined) {
+      search.set(key, value);
+    }
+  }
+  const query = search.toString();
+  return query ? `/government?${query}` : "/government";
+}
+
 function isRole(value: string | undefined): value is Role {
-  return Boolean(value && roles.includes(value as Role));
+  return Boolean(value && roleValues.includes(value as Role));
 }
 
 function isView(value: string | undefined): value is View {

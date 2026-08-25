@@ -2,7 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Pool, type QueryResultRow } from "pg";
-import { ApprovalEvent, Booking, Creative, DisplayTemplate, InventoryAdvertiserResource, InventoryComment, InventoryItem, MediaResource, PopLog, Role, Transaction, TransactionStatus, UserStatus, displayTemplates } from "../data";
+import { ApprovalEvent, Booking, Creative, DeviceAlert, DeviceAlertType, DisplayTemplate, InventoryAdvertiserResource, InventoryComment, InventoryItem, InventorySpecification, MediaResource, MembershipRole, Organization, PopLog, Role, Transaction, TransactionStatus, UserStatus, displayTemplates } from "../data";
+import { isLocale, type Locale } from "../i18n/config";
 import { expectedPlays, splitRevenue } from "../utils";
 
 type UserRow = {
@@ -39,8 +40,28 @@ type InventoryRow = {
   approval_status: NonNullable<InventoryItem["approvalStatus"]>;
   tags: unknown;
   display_template: string | null;
+  display_language: string | null;
   comments_enabled: boolean;
   institution_id: string | null;
+  owner_organization_id: string | null;
+  delivery_mode: InventoryItem["deliveryMode"];
+  product_type: string | null;
+  production_lead_days: number;
+  installation_lead_days: number;
+  latitude: number | null;
+  longitude: number | null;
+  measurement_source: string | null;
+  measurement_updated_at: string | null;
+};
+
+type OrganizationRow = { id: string; name: string; type: Organization["type"]; status: Organization["status"]; default_currency: "CAD"; timezone: string };
+type MembershipRow = { organization_id: string; membership_role: MembershipRole };
+type InventorySpecificationRow = {
+  id: string; inventory_id: string; version: number; status: InventorySpecification["status"];
+  trim_width_mm: number | null; trim_height_mm: number | null; visible_width_mm: number | null; visible_height_mm: number | null;
+  bleed_mm: number | null; safe_area_mm: number | null; scale_ratio: string | null; minimum_dpi: number | null;
+  colour_space: string | null; accepted_file_types: unknown; maximum_file_bytes: number | null; substrate: string | null;
+  finishing: string | null; template_url: string | null; notes: string | null; created_at: string;
 };
 
 type BookingRow = {
@@ -79,10 +100,27 @@ type MediaRow = {
   original_name: string;
   mime_type: string;
   media_type: MediaResource["mediaType"];
+  approval_status: MediaResource["approvalStatus"];
   size_bytes: number;
   storage_path: string;
   public_url: string;
   created_at: string;
+};
+
+type DeviceAlertRow = {
+  id: string;
+  institution_id: string;
+  alert_type: DeviceAlertType;
+  title: string;
+  message: string;
+  area: string;
+  status: DeviceAlert["status"];
+  target_device_ids: unknown;
+  issued_by: string;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string;
+  ended_at: string | null;
 };
 
 type TransactionRow = {
@@ -255,7 +293,11 @@ export async function resetDatabaseForTests() {
   if (process.env.NODE_ENV !== "test") throw new Error("resetDatabaseForTests is only available during tests");
   await ensureSchema();
   await getPool().query(`
-    TRUNCATE inventory_comments, approval_events, creatives, pop_logs, transactions, media_resources, bookings, inventory, sessions, users, app_metadata
+    TRUNCATE idempotency_records, notifications, activity_events, placement_issues, digital_delivery_events, proof_records, work_order_evidence,
+      installation_work_orders, production_jobs, creative_assignments, creative_reviews, creative_versions, creative_assets,
+      design_requests, commercial_acceptances, quote_line_items, quotes, placements, campaigns, client_authorizations,
+      brands, agency_clients, inventory_specifications, organization_memberships, inventory_comments, approval_events,
+      creatives, pop_logs, transactions, device_alerts, media_resources, bookings, inventory, sessions, organizations, users, app_metadata
     RESTART IDENTITY CASCADE
   `);
 }
@@ -280,6 +322,44 @@ export async function getInventory(id: string) {
   return entry ? mapInventory(entry) : null;
 }
 
+export async function listOrganizationsForUser(userId: string) {
+  const result = await rows<OrganizationRow & MembershipRow>(`
+    SELECT organizations.*, organization_memberships.organization_id, organization_memberships.membership_role
+    FROM organization_memberships JOIN organizations ON organizations.id = organization_memberships.organization_id
+    WHERE organization_memberships.user_id = $1 AND organizations.status = 'active' ORDER BY lower(organizations.name)
+  `, [userId]);
+  return result.map((entry) => ({ organization: mapOrganization(entry), membershipRole: entry.membership_role }));
+}
+
+export async function getOrganizationMembership(userId: string, organizationId: string) {
+  return row<MembershipRow>("SELECT organization_id, membership_role FROM organization_memberships WHERE user_id = $1 AND organization_id = $2", [userId, organizationId]);
+}
+
+export async function listInventorySpecifications(inventoryId: string) {
+  return (await rows<InventorySpecificationRow>("SELECT * FROM inventory_specifications WHERE inventory_id = $1 ORDER BY version DESC", [inventoryId])).map(mapInventorySpecification);
+}
+
+export async function createInventorySpecification(inventoryId: string, specification: Omit<InventorySpecification, "id" | "inventoryId" | "version" | "status" | "createdAt">, userId: string) {
+  const database = await getPool().connect();
+  try {
+    await database.query("BEGIN");
+    await database.query("SELECT id FROM inventory WHERE id = $1 FOR UPDATE", [inventoryId]);
+    const next = await database.query<{ version: number }>("SELECT COALESCE(MAX(version), 0) + 1 AS version FROM inventory_specifications WHERE inventory_id = $1", [inventoryId]);
+    const version = Number(next.rows[0]?.version ?? 1);
+    await database.query("UPDATE inventory_specifications SET status = 'retired' WHERE inventory_id = $1 AND status = 'active'", [inventoryId]);
+    const id = `SPEC-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+    await database.query(`INSERT INTO inventory_specifications
+      (id, inventory_id, version, status, trim_width_mm, trim_height_mm, visible_width_mm, visible_height_mm, bleed_mm, safe_area_mm, scale_ratio, minimum_dpi, colour_space, accepted_file_types, maximum_file_bytes, substrate, finishing, template_url, notes, created_by, created_at)
+      VALUES ($1,$2,$3,'active',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20)`,
+      [id, inventoryId, version, specification.trimWidthMm, specification.trimHeightMm, specification.visibleWidthMm, specification.visibleHeightMm, specification.bleedMm, specification.safeAreaMm, specification.scaleRatio, specification.minimumDpi, specification.colourSpace, JSON.stringify(specification.acceptedFileTypes), specification.maximumFileBytes, specification.substrate, specification.finishing, specification.templateUrl, specification.notes, userId, new Date().toISOString()]);
+    await database.query("COMMIT");
+    return (await listInventorySpecifications(inventoryId))[0];
+  } catch (error) {
+    await database.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally { database.release(); }
+}
+
 export async function listPublishedInventory() {
   return (await rows<InventoryRow>("SELECT * FROM inventory WHERE approval_status = 'approved' ORDER BY id")).map(mapInventory);
 }
@@ -292,11 +372,19 @@ export async function getPublishedInventory(id: string) {
 export async function createInventory(item: InventoryItem, userId: string, institutionId: string | null = null) {
   const now = new Date().toISOString();
   const tags = normalizeTags(item.tags);
+  const ownerUserId = institutionId ?? userId;
+  const ownerOrganizationId = item.ownerOrganizationId ?? `ORG-${ownerUserId}`;
+  await exec(`INSERT INTO organizations (id,name,type,status,created_at,updated_at)
+    SELECT $1,name,CASE role WHEN 'advertiser' THEN 'advertiser' WHEN 'institutional' THEN 'institution' WHEN 'admin' THEN 'platform' ELSE 'media_owner' END,'active',$2,$2 FROM users WHERE id=$3
+    ON CONFLICT(id) DO NOTHING`, [ownerOrganizationId,now,ownerUserId]);
+  await exec(`INSERT INTO organization_memberships (organization_id,user_id,membership_role,created_at)
+    SELECT $1,id,CASE role WHEN 'admin' THEN 'admin' WHEN 'operator' THEN 'operations' ELSE 'owner' END,$2 FROM users WHERE id=$3
+    ON CONFLICT(organization_id,user_id) DO NOTHING`, [ownerOrganizationId,now,userId]);
   await exec(`
     INSERT INTO inventory
-    (id, name, operator, format, x, y, address, price, impressions, traffic, income, audience, competitor, occupancy, image_interval, max_loop_seconds, available_from, available_to, approval_status, tags, display_template, comments_enabled, institution_id, created_by, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21, $22, $23, $24, $25, $26)
-  `, [item.id, item.name, item.operator, item.format, item.x, item.y, item.address, item.price, item.impressions, item.traffic, item.income, item.audience, item.competitor, item.occupancy, clampImageInterval(item.imageInterval), clampLoopCapacity(item.maxLoopSeconds), item.availableFrom, item.availableTo, item.approvalStatus ?? "approved", serializeTags(tags.length ? tags : suggestedTagsForInventory(item)), normalizeDisplayTemplate(item.displayTemplate), item.commentsEnabled !== false, institutionId, userId, now, now]);
+    (id, name, operator, format, x, y, address, price, impressions, traffic, income, audience, competitor, occupancy, image_interval, max_loop_seconds, available_from, available_to, approval_status, tags, display_template, comments_enabled, institution_id, created_by, created_at, updated_at, owner_organization_id, delivery_mode, product_type, production_lead_days, installation_lead_days, latitude, longitude, measurement_source, measurement_updated_at, display_language)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+  `, [item.id, item.name, item.operator, item.format, item.x, item.y, item.address, item.price, item.impressions, item.traffic, item.income, item.audience, item.competitor, item.occupancy, clampImageInterval(item.imageInterval), clampLoopCapacity(item.maxLoopSeconds), item.availableFrom, item.availableTo, item.approvalStatus ?? "approved", serializeTags(tags.length ? tags : suggestedTagsForInventory(item)), normalizeDisplayTemplate(item.displayTemplate), item.commentsEnabled !== false, institutionId, userId, now, now, ownerOrganizationId, item.deliveryMode ?? (item.format === "digital" ? "digital" : item.format === "static" ? "static" : "unknown"), item.productType ?? item.format, item.productionLeadDays ?? 0, item.installationLeadDays ?? 0, item.latitude ?? null, item.longitude ?? null, item.measurementSource ?? null, item.measurementUpdatedAt ?? null, normalizeDisplayLanguage(item.displayLanguage)]);
   return getInventory(item.id);
 }
 
@@ -308,13 +396,20 @@ export async function updateInventoryRecord(id: string, updates: Partial<Invento
     UPDATE inventory SET
       name = $1, operator = $2, format = $3, x = $4, y = $5, address = $6, price = $7, impressions = $8, traffic = $9, income = $10,
       audience = $11, competitor = $12, occupancy = $13, image_interval = $14, max_loop_seconds = $15, available_from = $16, available_to = $17,
-      approval_status = $18, tags = $19::jsonb, display_template = $20, comments_enabled = $21, updated_at = $22
-    WHERE id = $23
-  `, [next.name, next.operator, next.format, next.x, next.y, next.address, next.price, next.impressions, next.traffic, next.income, next.audience, next.competitor, next.occupancy, clampImageInterval(next.imageInterval), clampLoopCapacity(next.maxLoopSeconds), next.availableFrom, next.availableTo, next.approvalStatus ?? "approved", serializeTags(next.tags), normalizeDisplayTemplate(next.displayTemplate), next.commentsEnabled !== false, new Date().toISOString(), id]);
+      approval_status = $18, tags = $19::jsonb, display_template = $20, comments_enabled = $21, updated_at = $22,
+      delivery_mode = $23, product_type = $24, production_lead_days = $25, installation_lead_days = $26,
+      latitude = $27, longitude = $28, measurement_source = $29, measurement_updated_at = $30, display_language = $31
+    WHERE id = $32
+  `, [next.name, next.operator, next.format, next.x, next.y, next.address, next.price, next.impressions, next.traffic, next.income, next.audience, next.competitor, next.occupancy, clampImageInterval(next.imageInterval), clampLoopCapacity(next.maxLoopSeconds), next.availableFrom, next.availableTo, next.approvalStatus ?? "approved", serializeTags(next.tags), normalizeDisplayTemplate(next.displayTemplate), next.commentsEnabled !== false, new Date().toISOString(), next.deliveryMode ?? "unknown", next.productType ?? next.format, next.productionLeadDays ?? 0, next.installationLeadDays ?? 0, next.latitude ?? null, next.longitude ?? null, next.measurementSource ?? null, next.measurementUpdatedAt ?? null, normalizeDisplayLanguage(next.displayLanguage), id]);
   return getInventory(id);
 }
 
 export async function deleteInventoryRecord(id: string) {
+  await exec(`DELETE FROM campaigns WHERE id IN (
+    SELECT campaigns.id FROM campaigns JOIN placements ON placements.campaign_id=campaigns.id
+    WHERE campaigns.id LIKE 'CMP-LEGACY-%'
+    GROUP BY campaigns.id HAVING BOOL_AND(placements.inventory_id=$1)
+  )`, [id]);
   await exec("DELETE FROM inventory WHERE id = $1", [id]);
 }
 
@@ -341,7 +436,52 @@ export async function createBookingRecord(booking: Booking, userId: string) {
     INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
   `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, clampAdSlots(booking.adSlots), booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, now, now]);
+  await exec(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
+    SELECT 'CMP-LEGACY-' || $1,'ORG-' || $2,$3,'Legacy booking compatibility',inventory.address,$4,$5,'upload',$6,$2,$7,$7 FROM inventory WHERE inventory.id=$8
+    ON CONFLICT(id) DO NOTHING`, [booking.id,userId,booking.campaign,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "planning",now,booking.inventoryId]);
+  await exec(`INSERT INTO placements (id,campaign_id,inventory_id,delivery_mode,start_date,end_date,status,estimated_media_cost,price_snapshot,created_at,updated_at)
+    SELECT 'PLC-LEGACY-' || $1,'CMP-LEGACY-' || $1,inventory.id,inventory.delivery_mode,$2,$3,$4,$5,$6::jsonb,$7,$7 FROM inventory WHERE inventory.id=$8
+    ON CONFLICT(id) DO NOTHING`, [booking.id,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "requested",booking.spend,JSON.stringify({legacyBookingId:booking.id,amount:booking.spend,currency:"CAD",capturedAt:now}),now,booking.inventoryId]);
   return { ...booking, adSlots: clampAdSlots(booking.adSlots), createdBy: userId };
+}
+
+export async function createBookingWithCreativeRecord(
+  booking: Booking,
+  userId: string,
+  creative: Omit<Creative, "createdAt"> & { storagePath: string },
+) {
+  await ensureSchema();
+  const database = await getPool().connect();
+  const createdAt = new Date().toISOString();
+  const adSlots = clampAdSlots(booking.adSlots);
+  try {
+    await database.query("BEGIN");
+    await database.query(`
+      INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, adSlots, booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, createdAt, createdAt]);
+    await database.query(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
+      SELECT 'CMP-LEGACY-' || $1,'ORG-' || $2,$3,'Legacy booking compatibility',inventory.address,$4,$5,'upload','planning',$2,$6,$6 FROM inventory WHERE inventory.id=$7
+      ON CONFLICT(id) DO NOTHING`, [booking.id, userId, booking.campaign, booking.start, booking.end, createdAt, booking.inventoryId]);
+    await database.query(`INSERT INTO placements (id,campaign_id,inventory_id,delivery_mode,start_date,end_date,status,estimated_media_cost,price_snapshot,created_at,updated_at)
+      SELECT 'PLC-LEGACY-' || $1,'CMP-LEGACY-' || $1,inventory.id,inventory.delivery_mode,$2,$3,'requested',$4,$5::jsonb,$6,$6 FROM inventory WHERE inventory.id=$7
+      ON CONFLICT(id) DO NOTHING`, [booking.id, booking.start, booking.end, booking.spend, JSON.stringify({ legacyBookingId: booking.id, amount: booking.spend, currency: "CAD", capturedAt: createdAt }), createdAt, booking.inventoryId]);
+    await database.query(`
+      INSERT INTO creatives (id, booking_id, source, template, format, width, height, file_type, file_size, safe_zone, distortion, original_name, mime_type, public_url, storage_path, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    `, [creative.id, creative.bookingId, creative.source, creative.template, creative.format, creative.width, creative.height, creative.fileType, creative.fileSize, creative.safeZone, creative.distortion, creative.originalName, creative.mimeType, creative.publicUrl, creative.storagePath, creative.status, createdAt]);
+    await database.query("COMMIT");
+    const { storagePath: _storagePath, ...storedCreative } = creative;
+    return {
+      booking: { ...booking, adSlots, createdBy: userId },
+      creative: { ...storedCreative, createdAt } satisfies Creative,
+    };
+  } catch (error) {
+    await database.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    database.release();
+  }
 }
 
 export async function updateBookingRecord(id: string, updates: Partial<Booking>) {
@@ -353,6 +493,9 @@ export async function updateBookingRecord(id: string, updates: Partial<Booking>)
       ad_slots = $7, status = $8, spend = $9, paid = $10, pop = $11, updated_at = $12
     WHERE id = $13
   `, [next.advertiser, next.inventoryId, next.campaign, next.start, next.end, next.creativeStatus, clampAdSlots(next.adSlots), next.status, next.spend, next.paid, next.pop, new Date().toISOString(), id]);
+  const compatibilityStatus = next.status === "approved" ? "confirmed" : "requested";
+  await exec("UPDATE campaigns SET name=$1,start_date=$2,end_date=$3,status=$4,version=version+1,updated_at=$5 WHERE id='CMP-LEGACY-' || $6", [next.campaign,next.start,next.end,next.status === "approved" ? "confirmed" : "planning",new Date().toISOString(),id]);
+  await exec("UPDATE placements SET inventory_id=$1,start_date=$2,end_date=$3,status=$4,estimated_media_cost=$5,version=version+1,updated_at=$6 WHERE id='PLC-LEGACY-' || $7", [next.inventoryId,next.start,next.end,compatibilityStatus,next.spend,new Date().toISOString(),id]);
   return getBooking(id);
 }
 
@@ -539,6 +682,7 @@ export async function getPublicMediaResource(id: string) {
     FROM media_resources
     JOIN inventory ON inventory.id = media_resources.inventory_id
     WHERE media_resources.id = $1
+      AND media_resources.approval_status = 'approved'
       AND inventory.approval_status = 'approved'
   `, [id]);
   if (media) return {
@@ -630,10 +774,99 @@ export async function deleteMediaResource(id: string) {
 export async function createMediaResource(resource: MediaResource & { storagePath: string }) {
   await exec(`
     INSERT INTO media_resources
-    (id, inventory_id, owner_id, title, original_name, mime_type, media_type, size_bytes, storage_path, public_url, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-  `, [resource.id, resource.inventoryId, resource.ownerId, resource.title, resource.originalName, resource.mimeType, resource.mediaType, resource.sizeBytes, resource.storagePath, resource.publicUrl, resource.createdAt]);
+    (id, inventory_id, owner_id, title, original_name, mime_type, media_type, approval_status, size_bytes, storage_path, public_url, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  `, [resource.id, resource.inventoryId, resource.ownerId, resource.title, resource.originalName, resource.mimeType, resource.mediaType, resource.approvalStatus, resource.sizeBytes, resource.storagePath, resource.publicUrl, resource.createdAt]);
   return resource;
+}
+
+export async function updateMediaApprovalStatus(id: string, approvalStatus: MediaResource["approvalStatus"]) {
+  const result = await exec("UPDATE media_resources SET approval_status = $1 WHERE id = $2", [approvalStatus, id]);
+  return result.rowCount ? (await getMediaResource(id))?.resource ?? null : null;
+}
+
+export async function listDeviceAlerts(institutionId?: string, asOf = new Date().toISOString()) {
+  const scopeClause = institutionId ? "WHERE institution_id = $1" : "";
+  const asOfParameter = institutionId ? "$2" : "$1";
+  const result = await rows<DeviceAlertRow>(`
+    WITH scoped AS (
+      SELECT * FROM device_alerts ${scopeClause}
+    ), recent AS (
+      SELECT * FROM scoped ORDER BY created_at DESC LIMIT 100
+    ), active AS (
+      SELECT * FROM scoped WHERE status = 'active' AND expires_at > ${asOfParameter}
+    )
+    SELECT * FROM (
+      SELECT * FROM active
+      UNION
+      SELECT * FROM recent
+    ) selected
+    ORDER BY created_at DESC
+  `, institutionId ? [institutionId, asOf] : [asOf]);
+  return result.map(mapDeviceAlert);
+}
+
+export async function getDeviceAlert(id: string) {
+  const entry = await row<DeviceAlertRow>("SELECT * FROM device_alerts WHERE id = $1", [id]);
+  return entry ? mapDeviceAlert(entry) : null;
+}
+
+export async function getActiveDeviceAlertForDevice(deviceId: string, asOf = new Date().toISOString()) {
+  const entry = await row<DeviceAlertRow>(`
+    SELECT * FROM device_alerts
+    WHERE status = 'active'
+      AND expires_at > $1
+      AND target_device_ids ? $2
+    ORDER BY created_at DESC
+    LIMIT 1
+  `, [asOf, deviceId]);
+  return entry ? mapDeviceAlert(entry) : null;
+}
+
+export async function createDeviceAlert(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">) {
+  const created = materializeDeviceAlert(alert);
+  await exec(deviceAlertInsertSql, deviceAlertInsertParams(created));
+  return created;
+}
+
+export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">) {
+  await ensureSchema();
+  const database = await getPool().connect();
+  const created = materializeDeviceAlert(alert);
+
+  try {
+    await database.query("BEGIN");
+    await database.query("SELECT pg_advisory_xact_lock(hashtext('device-alert'), hashtext($1))", [alert.institutionId]);
+    const conflict = await database.query<DeviceAlertRow>(`
+      SELECT * FROM device_alerts
+      WHERE institution_id = $1
+        AND status = 'active'
+        AND expires_at > $2
+        AND target_device_ids ?| $3::text[]
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [alert.institutionId, created.createdAt, alert.targetDeviceIds]);
+
+    if (conflict.rows[0]) {
+      await database.query("ROLLBACK");
+      return { alert: null, conflictingAlert: mapDeviceAlert(conflict.rows[0]) };
+    }
+
+    await database.query(deviceAlertInsertSql, deviceAlertInsertParams(created));
+    await database.query("COMMIT");
+    return { alert: created, conflictingAlert: null };
+  } catch (error) {
+    await database.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    database.release();
+  }
+}
+
+export async function endDeviceAlert(id: string) {
+  const endedAt = new Date().toISOString();
+  const result = await exec("UPDATE device_alerts SET status = 'ended', ended_at = $1 WHERE id = $2 AND status = 'active'", [endedAt, id]);
+  return result.rowCount ? getDeviceAlert(id) : null;
 }
 
 export async function getUserByEmail(email: string) {
@@ -664,6 +897,12 @@ export async function createUser(name: string, email: string, passwordHash: stri
   };
   await exec("INSERT INTO users (id, name, email, password_hash, role, status, institution_id, operator_limit, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     [entry.id, entry.name, entry.email, entry.password_hash, entry.role, entry.status, entry.institution_id, entry.operator_limit, entry.created_at]);
+  const organizationId = role === "operator" && entry.institution_id ? `ORG-${entry.institution_id}` : `ORG-${entry.id}`;
+  if (!(role === "operator" && entry.institution_id)) {
+    const organizationType = role === "advertiser" ? "advertiser" : role === "institutional" ? "institution" : role === "admin" ? "platform" : "media_owner";
+    await exec("INSERT INTO organizations (id, name, type, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4) ON CONFLICT (id) DO NOTHING", [organizationId, name, organizationType, entry.created_at]);
+  }
+  await exec("INSERT INTO organization_memberships (organization_id, user_id, membership_role, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id, user_id) DO NOTHING", [organizationId, entry.id, role === "operator" ? "operations" : role === "admin" ? "admin" : "owner", entry.created_at]);
   return mapUser(entry);
 }
 
@@ -749,6 +988,10 @@ function normalizeDisplayTemplate(value: unknown): DisplayTemplate {
   return typeof value === "string" && (displayTemplates as string[]).includes(value) ? (value as DisplayTemplate) : "fullscreen";
 }
 
+function normalizeDisplayLanguage(value: unknown): Locale {
+  return isLocale(value) ? value : "en";
+}
+
 function mapInventoryComment(entry: InventoryCommentRow): InventoryComment {
   return {
     id: entry.id,
@@ -783,10 +1026,38 @@ function mapInventory(entry: InventoryRow): InventoryItem {
     approvalStatus: entry.approval_status ?? "approved",
     tags: parseTags(entry.tags),
     displayTemplate: normalizeDisplayTemplate(entry.display_template),
+    displayLanguage: normalizeDisplayLanguage(entry.display_language),
     commentsEnabled: entry.comments_enabled !== false,
     institutionId: entry.institution_id ?? null,
+    ownerOrganizationId: entry.owner_organization_id ?? null,
+    deliveryMode: entry.delivery_mode ?? "unknown",
+    productType: entry.product_type ?? entry.format,
+    productionLeadDays: Number(entry.production_lead_days ?? 0),
+    installationLeadDays: Number(entry.installation_lead_days ?? 0),
+    latitude: entry.latitude == null ? null : Number(entry.latitude),
+    longitude: entry.longitude == null ? null : Number(entry.longitude),
+    measurementSource: entry.measurement_source ?? null,
+    measurementUpdatedAt: entry.measurement_updated_at ? stringifyDate(entry.measurement_updated_at) : null,
   };
 }
+
+function mapOrganization(entry: OrganizationRow): Organization {
+  return { id: entry.id, name: entry.name, type: entry.type, status: entry.status, defaultCurrency: entry.default_currency, timezone: entry.timezone };
+}
+
+function mapInventorySpecification(entry: InventorySpecificationRow): InventorySpecification {
+  return {
+    id: entry.id, inventoryId: entry.inventory_id, version: Number(entry.version), status: entry.status,
+    trimWidthMm: numberOrNull(entry.trim_width_mm), trimHeightMm: numberOrNull(entry.trim_height_mm),
+    visibleWidthMm: numberOrNull(entry.visible_width_mm), visibleHeightMm: numberOrNull(entry.visible_height_mm),
+    bleedMm: numberOrNull(entry.bleed_mm), safeAreaMm: numberOrNull(entry.safe_area_mm), scaleRatio: entry.scale_ratio,
+    minimumDpi: numberOrNull(entry.minimum_dpi), colourSpace: entry.colour_space, acceptedFileTypes: parseStringArray(entry.accepted_file_types),
+    maximumFileBytes: numberOrNull(entry.maximum_file_bytes), substrate: entry.substrate, finishing: entry.finishing,
+    templateUrl: entry.template_url, notes: entry.notes, createdAt: stringifyDate(entry.created_at),
+  };
+}
+
+function numberOrNull(value: unknown) { return value == null ? null : Number(value); }
 
 function serializeTags(value: unknown) {
   return JSON.stringify(normalizeTags(value));
@@ -886,10 +1157,49 @@ function mapMedia(entry: MediaRow): MediaResource {
     originalName: entry.original_name,
     mimeType: entry.mime_type,
     mediaType: entry.media_type,
+    approvalStatus: entry.approval_status,
     sizeBytes: Number(entry.size_bytes),
     publicUrl: entry.public_url,
     createdAt: stringifyDate(entry.created_at),
   };
+}
+
+function mapDeviceAlert(entry: DeviceAlertRow): DeviceAlert {
+  return {
+    id: entry.id,
+    institutionId: entry.institution_id,
+    alertType: entry.alert_type,
+    title: entry.title,
+    message: entry.message,
+    area: entry.area,
+    status: entry.status,
+    targetDeviceIds: parseStringArray(entry.target_device_ids),
+    issuedBy: entry.issued_by,
+    createdBy: entry.created_by,
+    createdAt: stringifyDate(entry.created_at),
+    expiresAt: stringifyDate(entry.expires_at),
+    endedAt: entry.ended_at ? stringifyDate(entry.ended_at) : null,
+  };
+}
+
+const deviceAlertInsertSql = `
+  INSERT INTO device_alerts
+    (id, institution_id, alert_type, title, message, area, status, target_device_ids, issued_by, created_by, created_at, expires_at, ended_at)
+  VALUES ($1, $2, $3, $4, $5, $6, 'active', $7::jsonb, $8, $9, $10, $11, NULL)
+`;
+
+function materializeDeviceAlert(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">): DeviceAlert {
+  return {
+    ...alert,
+    id: `ALT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+    status: "active",
+    createdAt: new Date().toISOString(),
+    endedAt: null,
+  };
+}
+
+function deviceAlertInsertParams(alert: DeviceAlert) {
+  return [alert.id, alert.institutionId, alert.alertType, alert.title, alert.message, alert.area, JSON.stringify(alert.targetDeviceIds), alert.issuedBy, alert.createdBy, alert.createdAt, alert.expiresAt];
 }
 
 function mapUser(entry: UserRow): DbUser {
@@ -957,4 +1267,17 @@ function mapCreative(entry: CreativeRow): Creative {
 
 function stringifyDate(value: unknown) {
   return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function parseStringArray(value: unknown) {
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === "string");
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }

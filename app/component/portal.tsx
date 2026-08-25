@@ -1,18 +1,20 @@
 "use client";
 
 import "./portal.css";
+import { ArrowUpRight } from "lucide-react";
 import { Booking, FormatKey, InventoryItem, Role, View, formats } from "../data";
 import type { DbUser } from "../lib/db";
 import type { Filters } from "../types";
+import { roleLabel } from "../roles";
 import { money, number, portalHref } from "../utils";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import { Brand, Metric, NavLinkButton, SectionHeading } from "./shared-ui";
+import { LanguageSelector, useI18n } from "../i18n/client";
+import { isMarketplaceInventoryAvailable } from "../lib/inventory-availability";
 
 export default function Portal({
   inventory,
   bookings,
-  visibleInventory,
-  selectedInventoryId,
   selectedLocation,
   filters,
   launch,
@@ -21,20 +23,19 @@ export default function Portal({
 }: {
   inventory: InventoryItem[];
   bookings: Booking[];
-  visibleInventory: (InventoryItem & { distance: number })[];
-  selectedInventoryId: string;
   selectedLocation: { x: number; y: number };
   filters: Filters;
   launch: (role: Role, view: View) => void;
   selectFormat: (format: FormatKey) => void;
   currentUser?: DbUser | null;
 }) {
-  const totalImpressions = inventory.reduce((sum, item) => sum + item.impressions, 0);
+  const { locale, t } = useI18n();
+  const availableInventory = inventory.filter((item) => isMarketplaceInventoryAvailable(item));
+  const totalImpressions = availableInventory.reduce((sum, item) => sum + item.impressions, 0);
   const bookedRevenue = bookings.reduce((sum, booking) => sum + booking.spend, 0);
   const operatorNames = Array.from(new Set(inventory.map((item) => item.operator)));
   const operators = operatorNames.length;
   const canAccessRole = (targetRole: Role) => Boolean(currentUser && (currentUser.role === "admin" || currentUser.role === targetRole));
-  const canAccessInstitutionalPortal = currentUser?.role === "admin" || currentUser?.role === "institutional";
 
   return (
     <div className="portal">
@@ -43,66 +44,56 @@ export default function Portal({
         <div className="portal-nav-actions">
           {currentUser ? (
             <>
-              <span className="session-chip">{currentUser.name} - {currentUser.role === "admin" ? "Super Admin" : currentUser.role}</span>
-              <form action="/api/auth/logout" method="post"><button type="submit">Sign Out</button></form>
+              <span className="session-chip">{currentUser.name} - {t(roleLabel(currentUser.role))}</span>
+              <form action="/api/auth/logout" method="post" noValidate><button type="submit">{t("Sign out")}</button></form>
             </>
           ) : (
             <>
-              <a href="/login">Sign In</a>
-              <a href="/signup">Sign Up</a>
+              <a href="/login">{t("Sign in")}</a>
+              <a href="/signup">{t("Sign up")}</a>
             </>
           )}
-          <ProtectedPortalLink currentUser={currentUser} role="operator" view="inventory" onLaunch={launch}>Operator Portal</ProtectedPortalLink>
-          {canAccessInstitutionalPortal ? (
-            <ProtectedPortalLink currentUser={currentUser} role="institutional" view="inventory" onLaunch={launch}>Institution Portal</ProtectedPortalLink>
-          ) : null}
           <ProtectedPortalLink className="primary-button" currentUser={currentUser} role="advertiser" view="discover" onLaunch={launch}>Launch Campaign</ProtectedPortalLink>
+          <LanguageSelector placement="embedded" />
         </div>
       </header>
       <main>
         <section className="portal-hero">
           <div className="portal-copy">
-            <p className="eyebrow pill"><span className="pill-dot" />OOH planning, booking, creative, and proof-of-play</p>
-            <h1>Outdoor <span className="hl">Campaign</span> Buying Portal</h1>
-            <p>Discover premium digital, static, and transit inventory, target by place and audience, reserve availability, validate creative, and track delivery from the same workspace.</p>
+            <p className="eyebrow pill"><span className="pill-dot" />{t("OOH planning, booking, creative, and proof-of-play")}</p>
+            <h1>{t("Outdoor Campaign Buying Portal")}</h1>
+            <p>{t("Discover premium digital, static, and transit inventory, target by place and audience, reserve availability, validate creative, and track delivery from the same workspace.")}</p>
             <div className="portal-actions">
               <ProtectedPortalLink className="primary-button" currentUser={currentUser} role="advertiser" view="discover" onLaunch={launch}>Plan Media Buy</ProtectedPortalLink>
               <ProtectedPortalLink className="ghost-button" currentUser={currentUser} role="operator" view="approvals" onLaunch={launch}>Review Bookings</ProtectedPortalLink>
             </div>
             <div className="portal-stats">
-              <Metric label="Available impressions" value={number(totalImpressions)} />
+              <Metric label="Available impressions" value={number(totalImpressions, locale)} />
               <Metric label="Operator networks" value={operators} />
-              <Metric label="Booked pipeline" value={money(bookedRevenue)} />
+              <Metric label="Booked pipeline" value={money(bookedRevenue, locale)} />
             </div>
           </div>
-          <div className="portal-visual" aria-label="Marketplace product preview">
+          <div className="portal-visual" aria-label={t("Marketplace product preview")}>
             <div className="preview-toolbar">
-              <span>Live marketplace</span>
-              <strong>{visibleInventory.length} units nearby</strong>
+              <span>{t("Live marketplace")}</span>
+              <strong>{t("{count} available units", { count: availableInventory.length })}</strong>
             </div>
             <div className="portal-map-wrap">
               <MapLibreInventoryMap
-                inventory={inventory}
-                visibleInventory={visibleInventory}
-                selectedInventoryId={selectedInventoryId}
+                inventory={availableInventory}
+                visibleInventory={availableInventory}
+                selectedInventoryId=""
                 selectedLocation={selectedLocation}
                 radius={filters.radius}
-                showCompetitors={filters.showCompetitors}
+                showCompetitors={false}
+                variant="portal"
               />
-            </div>
-            <div className="preview-float top">
-              <span>Audience match</span>
-              <strong>Professionals + travelers</strong>
-            </div>
-            <div className="preview-float bottom">
-              <span>Creative status</span>
-              <strong>5 validations passed</strong>
             </div>
           </div>
         </section>
         {operatorNames.length ? (
           <section className="portal-trust">
-            <span className="eyebrow">Live inventory from operator networks</span>
+            <span className="eyebrow">{t("Live inventory from operator networks")}</span>
             <div className="trust-logos">
               {operatorNames.map((name) => <span key={name}>{name}</span>)}
             </div>
@@ -131,11 +122,11 @@ export default function Portal({
               ["Creative Production", "Fixed templates and automated checks for aspect ratio, safe zones, file type, size, and distortion."],
               ["Inventory Control", "Multi-operator database with availability calendars, scheduling workflow, and double-booking protection."],
               ["Proof-of-Play", "Delivery logs and campaign reporting for impressions, reach estimates, verified playback, and effectiveness."],
-              ["Billing Ledger", "Invoice-ready campaign spend, payment status, and platform versus operator revenue-share tracking."],
+              ["Commercial Terms", "Quote-ready campaign estimates, offline approval status, and operator cost allocation without payment collection."],
             ].map(([title, copy]) => (
               <article className="portal-feature" key={title}>
-                <strong>{title}</strong>
-                <p>{copy}</p>
+                <strong>{t(title)}</strong>
+                <p>{t(copy)}</p>
               </article>
             ))}
           </div>
@@ -152,11 +143,23 @@ export default function Portal({
                   if (canAccessRole("advertiser")) selectFormat(key);
                 }}
               >
-                <span>{formats[key].label}</span>
-                <strong>{inventory.filter((item) => item.format === key).length} units</strong>
-                <small>{formats[key].spec}</small>
+                <span>{t(formats[key].label)}</span>
+                <strong>{t("{count} units", { count: inventory.filter((item) => item.format === key).length })}</strong>
+                <small>{t(formats[key].spec)}</small>
+                <span className="format-tile-cta">{t(canAccessRole("advertiser") ? "Explore units →" : "Sign in to explore →")}</span>
               </a>
             ))}
+          </div>
+        </section>
+        <section className="portal-institution-gateway" aria-labelledby="institution-gateway-title">
+          <div className="institution-gateway-copy">
+            <span className="eyebrow">{t("Government, institutions, and large networks")}</span>
+            <h2 id="institution-gateway-title">{t("Enter government workspace")}</h2>
+            <p>{t("See how Civic Screen Operations handles owned devices, direct image and video publishing, representative screen previews, fleet mapping, and bounded emergency overrides before secure sign-in.")}</p>
+          </div>
+          <div className="institution-gateway-action">
+            <a className="institution-gateway-link" href="/government/about">{t("View workspace details")} <ArrowUpRight aria-hidden="true" /></a>
+            <small>{t("Institution accounts and Super Admin only")}</small>
           </div>
         </section>
       </main>
@@ -179,14 +182,19 @@ function ProtectedPortalLink({
   children: React.ReactNode;
   onLaunch: (role: Role, view: View) => void;
 }) {
-  const href = portalHref(role, view);
-  if (!currentUser) return <a className={className} href={loginHref(role, view)}>{children}</a>;
-  if (currentUser.role !== "admin" && currentUser.role !== role) return <span className={`disabled-action ${className}`}>{children}</span>;
-  return <NavLinkButton className={className} href={href} onClick={() => onLaunch(role, view)}>{children}</NavLinkButton>;
+  const { t } = useI18n();
+  const localizedChildren = typeof children === "string" ? t(children) : children;
+  const isGovernmentEntry = role === "institutional" && view === "network";
+  const href = isGovernmentEntry ? "/government" : portalHref(role, view);
+  if (!currentUser) return <a className={className} href={isGovernmentEntry ? "/government/login?returnTo=%2Fgovernment" : loginHref(role, view)}>{localizedChildren}</a>;
+  if (currentUser.role !== "admin" && currentUser.role !== role) return <span className={`disabled-action ${className}`}>{localizedChildren}</span>;
+  if (isGovernmentEntry) return <a className={className} href={href}>{localizedChildren}</a>;
+  return <NavLinkButton className={className} href={href} onClick={() => onLaunch(role, view)}>{localizedChildren}</NavLinkButton>;
 }
 
 function PortalPath({ title, copy, children }: { title: string; copy: string; children: React.ReactNode }) {
-  return <article className="portal-path"><span className="eyebrow">{title}</span><p>{copy}</p>{children}</article>;
+  const { t } = useI18n();
+  return <article className="portal-path"><span className="eyebrow">{t(title)}</span><p>{t(copy)}</p>{children}</article>;
 }
 
 function loginHref(role: Role, view: View, extraQuery = "") {

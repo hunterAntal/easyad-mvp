@@ -10,6 +10,7 @@ const PLAYS_PER_TICK = 24;
 // Simulates a delivery tick: records a verified proof-of-play batch for every
 // deliverable campaign so reporting advances against real, persisted logs.
 export async function POST() {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEMO_DELIVERY_TICK !== "true") return NextResponse.json({ error: "Demo delivery tick is disabled" }, { status: 404 });
   const user = await getCurrentUser();
   if (!user || !canManageInventory(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
@@ -30,7 +31,7 @@ export async function POST() {
       plays: PLAYS_PER_TICK,
       impressions: Math.round(PLAYS_PER_TICK * impressionsPerPlay),
       status: "verified",
-      source: "delivery-tick",
+      source: "demo-delivery-tick",
       playedAt: now,
     });
   }

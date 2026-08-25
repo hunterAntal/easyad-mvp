@@ -1,8 +1,14 @@
+import type { Locale } from "./i18n/config";
+
 export type FormatKey = "digital" | "static" | "transit";
+export type DeliveryMode = "digital" | "static" | "unknown";
+export type OrganizationType = "advertiser" | "agency" | "media_owner" | "institution" | "production_vendor" | "installation_vendor" | "platform";
+export type MembershipRole = "owner" | "admin" | "planner" | "account_manager" | "designer" | "reviewer" | "operations" | "finance" | "viewer";
 export type Role = "advertiser" | "operator" | "institutional" | "admin";
 export type UserStatus = "active" | "banned";
 export type View =
   | "portal"
+  | "network"
   | "discover"
   | "booking"
   | "campaigns"
@@ -41,8 +47,50 @@ export type InventoryItem = {
   approvalStatus?: "pending approval" | "approved" | "rejected";
   tags?: string[];
   displayTemplate?: DisplayTemplate;
+  displayLanguage?: Locale;
   commentsEnabled?: boolean;
   institutionId?: string | null;
+  ownerOrganizationId?: string | null;
+  deliveryMode?: DeliveryMode;
+  productType?: string;
+  productionLeadDays?: number;
+  installationLeadDays?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  measurementSource?: string | null;
+  measurementUpdatedAt?: string | null;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  type: OrganizationType;
+  status: "active" | "inactive";
+  defaultCurrency: "CAD";
+  timezone: string;
+};
+
+export type InventorySpecification = {
+  id: string;
+  inventoryId: string;
+  version: number;
+  status: "active" | "retired";
+  trimWidthMm: number | null;
+  trimHeightMm: number | null;
+  visibleWidthMm: number | null;
+  visibleHeightMm: number | null;
+  bleedMm: number | null;
+  safeAreaMm: number | null;
+  scaleRatio: string | null;
+  minimumDpi: number | null;
+  colourSpace: string | null;
+  acceptedFileTypes: string[];
+  maximumFileBytes: number | null;
+  substrate: string | null;
+  finishing: string | null;
+  templateUrl: string | null;
+  notes: string | null;
+  createdAt: string;
 };
 
 export type InventoryComment = {
@@ -62,9 +110,28 @@ export type MediaResource = {
   originalName: string;
   mimeType: string;
   mediaType: "image" | "video" | "file";
+  approvalStatus: "pending review" | "approved" | "rejected";
   sizeBytes: number;
   publicUrl: string;
   createdAt: string;
+};
+
+export type DeviceAlertType = "amber" | "evacuation" | "public-safety";
+
+export type DeviceAlert = {
+  id: string;
+  institutionId: string;
+  alertType: DeviceAlertType;
+  title: string;
+  message: string;
+  area: string;
+  status: "active" | "ended";
+  targetDeviceIds: string[];
+  issuedBy: string;
+  createdBy: string | null;
+  createdAt: string;
+  expiresAt: string;
+  endedAt: string | null;
 };
 
 export type Booking = {
@@ -130,7 +197,7 @@ export type Creative = {
   format: FormatKey;
   width: number;
   height: number;
-  fileType: "png" | "jpg" | "pdf" | "mp4";
+  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4";
   fileSize: number;
   safeZone: number;
   distortion: number;

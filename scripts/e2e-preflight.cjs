@@ -1,4 +1,7 @@
 const { Pool } = require("pg");
+const { loadEnvConfig } = require("@next/env");
+
+loadEnvConfig(process.cwd());
 
 const connectionString = process.env.TEST_DATABASE_URL
   || process.env.DATABASE_URL

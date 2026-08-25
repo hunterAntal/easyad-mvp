@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS inventory (
   approval_status TEXT NOT NULL DEFAULT 'approved',
   tags JSONB NOT NULL DEFAULT '[]'::jsonb,
   display_template TEXT NOT NULL DEFAULT 'fullscreen',
+  display_language TEXT NOT NULL DEFAULT 'en' CHECK (display_language IN ('en', 'fr')),
   comments_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   institution_id TEXT,
   created_by TEXT,
@@ -72,10 +73,30 @@ CREATE TABLE IF NOT EXISTS media_resources (
   original_name TEXT NOT NULL,
   mime_type TEXT NOT NULL,
   media_type TEXT NOT NULL,
+  approval_status TEXT NOT NULL DEFAULT 'approved' CHECK (approval_status IN ('pending review', 'approved', 'rejected')),
   size_bytes INTEGER NOT NULL,
   storage_path TEXT NOT NULL,
   public_url TEXT NOT NULL,
   created_at TEXT NOT NULL
+);
+
+ALTER TABLE media_resources
+  ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+
+CREATE TABLE IF NOT EXISTS device_alerts (
+  id TEXT PRIMARY KEY,
+  institution_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  alert_type TEXT NOT NULL CHECK (alert_type IN ('amber', 'evacuation', 'public-safety')),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  area TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended')),
+  target_device_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  issued_by TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  ended_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -138,6 +159,245 @@ CREATE TABLE IF NOT EXISTS app_metadata (
   value TEXT NOT NULL
 );
 
+-- Phase 1: additive organization and inventory foundations. Legacy users.role,
+-- inventory.format/x/y, and institution ownership remain compatibility inputs.
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('advertiser', 'agency', 'media_owner', 'institution', 'production_vendor', 'installation_vendor', 'platform')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  default_currency TEXT NOT NULL DEFAULT 'CAD',
+  timezone TEXT NOT NULL DEFAULT 'America/Toronto',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_memberships (
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  membership_role TEXT NOT NULL CHECK (membership_role IN ('owner', 'admin', 'planner', 'account_manager', 'designer', 'reviewer', 'operations', 'finance', 'viewer')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (organization_id, user_id)
+);
+
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS owner_organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS delivery_mode TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS product_type TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS production_lead_days INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS installation_lead_days INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS measurement_source TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS measurement_updated_at TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS display_language TEXT NOT NULL DEFAULT 'en';
+
+CREATE TABLE IF NOT EXISTS inventory_specifications (
+  id TEXT PRIMARY KEY,
+  inventory_id TEXT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+  trim_width_mm INTEGER,
+  trim_height_mm INTEGER,
+  visible_width_mm INTEGER,
+  visible_height_mm INTEGER,
+  bleed_mm INTEGER,
+  safe_area_mm INTEGER,
+  scale_ratio TEXT,
+  minimum_dpi INTEGER,
+  colour_space TEXT,
+  accepted_file_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+  maximum_file_bytes BIGINT,
+  substrate TEXT,
+  finishing TEXT,
+  template_url TEXT,
+  notes TEXT,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (inventory_id, version)
+);
+
+-- Phases 2–6: campaign, agency, creative and mode-specific fulfillment.
+CREATE TABLE IF NOT EXISTS agency_clients (
+  id TEXT PRIMARY KEY, agency_organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS brands (
+  id TEXT PRIMARY KEY, client_id TEXT NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, default_language TEXT NOT NULL DEFAULT 'en', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS client_authorizations (
+  id TEXT PRIMARY KEY, client_id TEXT NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, capability TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', granted_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL, revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS campaigns (
+  id TEXT PRIMARY KEY, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+  client_id TEXT REFERENCES agency_clients(id) ON DELETE SET NULL, brand_id TEXT REFERENCES brands(id) ON DELETE SET NULL,
+  name TEXT NOT NULL, objective TEXT NOT NULL, geography TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL,
+  budget_min INTEGER, budget_max INTEGER, target_audience TEXT, message TEXT, required_languages JSONB NOT NULL DEFAULT '["en"]'::jsonb,
+  creative_path TEXT NOT NULL DEFAULT 'later', status TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS placements (
+  id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  inventory_id TEXT NOT NULL REFERENCES inventory(id) ON DELETE RESTRICT, delivery_mode TEXT NOT NULL,
+  start_date TEXT NOT NULL, end_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'requested',
+  estimated_media_cost INTEGER NOT NULL DEFAULT 0, estimated_production_cost INTEGER NOT NULL DEFAULT 0,
+  estimated_installation_cost INTEGER NOT NULL DEFAULT 0, price_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  specification_snapshot JSONB, creative_due_at TEXT, version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(campaign_id, inventory_id, start_date, end_date)
+);
+CREATE TABLE IF NOT EXISTS quotes (
+  id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'draft', currency TEXT NOT NULL DEFAULT 'CAD',
+  operator_confirmed_by TEXT REFERENCES users(id) ON DELETE SET NULL, operator_confirmed_at TEXT,
+  created_at TEXT NOT NULL, UNIQUE(campaign_id, version)
+);
+CREATE TABLE IF NOT EXISTS quote_line_items (
+  id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  placement_id TEXT REFERENCES placements(id) ON DELETE CASCADE, category TEXT NOT NULL,
+  description TEXT NOT NULL, amount INTEGER NOT NULL, is_estimate BOOLEAN NOT NULL DEFAULT TRUE
+);
+CREATE TABLE IF NOT EXISTS commercial_acceptances (
+  id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE RESTRICT,
+  accepted_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, accepted_at TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT 'offline', note TEXT, UNIQUE(quote_id)
+);
+CREATE TABLE IF NOT EXISTS design_requests (
+  id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'draft', priority TEXT NOT NULL DEFAULT 'normal', assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
+  due_at TEXT, brief JSONB NOT NULL DEFAULT '{}'::jsonb, version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS creative_assets (
+  id TEXT PRIMARY KEY, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+  campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE, name TEXT NOT NULL, retention_until TEXT,
+  created_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS creative_versions (
+  id TEXT PRIMARY KEY, asset_id TEXT NOT NULL REFERENCES creative_assets(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL, original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes BIGINT NOT NULL,
+  storage_path TEXT NOT NULL, checksum TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'submitted', preflight JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, created_at TEXT NOT NULL, UNIQUE(asset_id, version)
+);
+CREATE TABLE IF NOT EXISTS creative_reviews (
+  id TEXT PRIMARY KEY, creative_version_id TEXT NOT NULL REFERENCES creative_versions(id) ON DELETE RESTRICT,
+  review_type TEXT NOT NULL, decision TEXT NOT NULL, reason TEXT, actor_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  authorization_id TEXT REFERENCES client_authorizations(id) ON DELETE SET NULL, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS creative_assignments (
+  placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
+  creative_version_id TEXT NOT NULL REFERENCES creative_versions(id) ON DELETE RESTRICT,
+  assigned_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, created_at TEXT NOT NULL,
+  PRIMARY KEY(placement_id, creative_version_id)
+);
+CREATE TABLE IF NOT EXISTS production_jobs (
+  id TEXT PRIMARY KEY, placement_id TEXT NOT NULL UNIQUE REFERENCES placements(id) ON DELETE CASCADE,
+  vendor_organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL, creative_version_id TEXT REFERENCES creative_versions(id) ON DELETE RESTRICT,
+  substrate TEXT, quantity INTEGER NOT NULL DEFAULT 1, finishing TEXT, target_completion TEXT,
+  status TEXT NOT NULL DEFAULT 'not_ready', version INTEGER NOT NULL DEFAULT 1, private_notes TEXT, retention_until TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS installation_work_orders (
+  id TEXT PRIMARY KEY, placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
+  work_type TEXT NOT NULL DEFAULT 'install', status TEXT NOT NULL DEFAULT 'not_ready', planned_at TEXT,
+  assigned_organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL, assigned_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  access_notes TEXT, removal_at TEXT, completed_at TEXT, result TEXT, issue_code TEXT,
+  version INTEGER NOT NULL DEFAULT 1, retention_until TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS proof_records (
+  id TEXT PRIMARY KEY, placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
+  work_order_id TEXT REFERENCES installation_work_orders(id) ON DELETE SET NULL, proof_type TEXT NOT NULL,
+  evidence JSONB NOT NULL DEFAULT '[]'::jsonb, client_shareable BOOLEAN NOT NULL DEFAULT FALSE, public_shareable BOOLEAN NOT NULL DEFAULT FALSE,
+  certified_by TEXT REFERENCES users(id) ON DELETE SET NULL, certified_at TEXT, retention_until TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS work_order_evidence (
+  id TEXT PRIMARY KEY, work_order_id TEXT NOT NULL REFERENCES installation_work_orders(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes BIGINT NOT NULL,
+  storage_path TEXT NOT NULL, checksum TEXT NOT NULL, uploaded_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS digital_delivery_events (
+  id TEXT PRIMARY KEY, placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL UNIQUE, creative_version_id TEXT REFERENCES creative_versions(id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL, player_id TEXT, occurred_at TEXT NOT NULL, received_at TEXT NOT NULL, evidence JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE TABLE IF NOT EXISTS placement_issues (
+  id TEXT PRIMARY KEY, placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
+  issue_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', detail TEXT, created_at TEXT NOT NULL, resolved_at TEXT
+);
+CREATE TABLE IF NOT EXISTS activity_events (
+  id TEXT PRIMARY KEY, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  actor_id TEXT REFERENCES users(id) ON DELETE SET NULL, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL,
+  action TEXT NOT NULL, previous_state TEXT, next_state TEXT, metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  retention_until TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE, type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
+  subject_type TEXT, subject_id TEXT, read_at TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS idempotency_records (
+  scope TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, response_status INTEGER NOT NULL,
+  response_body JSONB NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(scope, idempotency_key)
+);
+
+INSERT INTO organizations (id, name, type, status, created_at, updated_at)
+SELECT 'ORG-' || id, name,
+  CASE role WHEN 'advertiser' THEN 'advertiser' WHEN 'institutional' THEN 'institution' WHEN 'admin' THEN 'platform' ELSE 'media_owner' END,
+  'active', created_at, created_at
+FROM users
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO organization_memberships (organization_id, user_id, membership_role, created_at)
+SELECT
+  CASE WHEN role = 'operator' AND institution_id IS NOT NULL THEN 'ORG-' || institution_id ELSE 'ORG-' || id END,
+  id,
+  CASE role WHEN 'admin' THEN 'admin' WHEN 'operator' THEN 'operations' ELSE 'owner' END,
+  created_at
+FROM users
+ON CONFLICT (organization_id, user_id) DO NOTHING;
+
+UPDATE inventory SET owner_organization_id = 'ORG-' || institution_id
+WHERE owner_organization_id IS NULL AND institution_id IS NOT NULL;
+UPDATE inventory SET owner_organization_id = 'ORG-' || created_by
+WHERE owner_organization_id IS NULL AND created_by IS NOT NULL AND EXISTS (SELECT 1 FROM organizations WHERE id = 'ORG-' || inventory.created_by);
+UPDATE inventory SET delivery_mode = CASE format WHEN 'digital' THEN 'digital' WHEN 'static' THEN 'static' ELSE 'unknown' END
+WHERE delivery_mode = 'unknown' AND format IN ('digital', 'static');
+UPDATE inventory SET product_type = format WHERE product_type IS NULL;
+
+-- Stable compatibility bridge for legacy single-placement bookings. This runs on
+-- every migration and never mutates the legacy source rows.
+INSERT INTO campaigns
+  (id, organization_id, name, objective, geography, start_date, end_date,
+   creative_path, status, created_by, created_at, updated_at)
+SELECT 'CMP-LEGACY-' || bookings.id, 'ORG-' || bookings.created_by,
+  bookings.campaign, 'Legacy booking migration', inventory.address,
+  bookings.start_date, bookings.end_date, 'upload',
+  CASE WHEN bookings.status = 'approved' THEN 'confirmed' ELSE 'planning' END,
+  bookings.created_by, bookings.created_at, bookings.updated_at
+FROM bookings JOIN inventory ON inventory.id = bookings.inventory_id
+WHERE bookings.created_by IS NOT NULL
+  AND EXISTS (SELECT 1 FROM organizations WHERE id = 'ORG-' || bookings.created_by)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO placements
+  (id, campaign_id, inventory_id, delivery_mode, start_date, end_date, status,
+   estimated_media_cost, price_snapshot, created_at, updated_at)
+SELECT 'PLC-LEGACY-' || bookings.id, 'CMP-LEGACY-' || bookings.id,
+  bookings.inventory_id, COALESCE(inventory.delivery_mode, 'digital'),
+  bookings.start_date, bookings.end_date,
+  CASE WHEN bookings.status = 'approved' THEN 'confirmed' ELSE 'requested' END,
+  bookings.spend,
+  jsonb_build_object('legacyBookingId', bookings.id, 'amount', bookings.spend,
+    'currency', 'CAD', 'capturedAt', bookings.created_at),
+  bookings.created_at, bookings.updated_at
+FROM bookings
+JOIN inventory ON inventory.id = bookings.inventory_id
+JOIN campaigns ON campaigns.id = 'CMP-LEGACY-' || bookings.id
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS inventory_comments (
   id TEXT PRIMARY KEY,
   inventory_id TEXT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
@@ -154,3 +414,17 @@ CREATE INDEX IF NOT EXISTS idx_approval_events_actor ON approval_events(actor_id
 CREATE INDEX IF NOT EXISTS idx_inventory_comments_inventory ON inventory_comments(inventory_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_institution ON inventory(institution_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_created_by ON bookings(created_by);
+CREATE INDEX IF NOT EXISTS idx_device_alerts_institution ON device_alerts(institution_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_device_alerts_active ON device_alerts(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_device_alerts_targets ON device_alerts USING GIN (target_device_ids);
+CREATE INDEX IF NOT EXISTS idx_memberships_user ON organization_memberships(user_id, organization_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_owner_org ON inventory(owner_organization_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_delivery_mode ON inventory(delivery_mode);
+CREATE INDEX IF NOT EXISTS idx_inventory_specs_active ON inventory_specifications(inventory_id, status, version DESC);
+CREATE INDEX IF NOT EXISTS idx_campaigns_org_status ON campaigns(organization_id, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_placements_campaign ON placements(campaign_id, status);
+CREATE INDEX IF NOT EXISTS idx_design_requests_queue ON design_requests(status, due_at);
+CREATE INDEX IF NOT EXISTS idx_work_orders_queue ON installation_work_orders(status, planned_at);
+CREATE INDEX IF NOT EXISTS idx_work_order_evidence_order ON work_order_evidence(work_order_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_subject ON activity_events(subject_type, subject_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at, created_at DESC);

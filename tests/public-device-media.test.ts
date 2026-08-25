@@ -33,6 +33,7 @@ const deviceImage: MediaResource = {
   originalName: "operator.png",
   mimeType: "image/png",
   mediaType: "image",
+  approvalStatus: "approved",
   sizeBytes: 1200,
   publicUrl: "/media/MED-API-IMAGE",
   createdAt: "2026-07-09T10:00:00.000Z",
@@ -66,17 +67,19 @@ function advertiserCreative(overrides: Partial<InventoryAdvertiserResource> = {}
 }
 
 test("device media includes only approved content active on the requested date", () => {
-  const result = buildActiveDeviceMedia(inventory, [deviceImage], [
+  const result = buildActiveDeviceMedia(inventory, [deviceImage, { ...deviceImage, id: "MED-PENDING", approvalStatus: "pending review" }], [
     advertiserCreative(),
+    advertiserCreative({ id: "CRV-GIF", fileType: "gif", originalName: "animated.gif", mimeType: "image/gif", publicUrl: "/media/CRV-GIF" }),
     advertiserCreative({ id: "CRV-PENDING", status: "pending review" }),
     advertiserCreative({ id: "CRV-FUTURE", start: "2026-08-01", end: "2026-08-31" }),
     advertiserCreative({ id: "CRV-EXPIRED", start: "2026-06-01", end: "2026-06-30" }),
     advertiserCreative({ id: "CRV-REJECTED", bookingStatus: "rejected" }),
   ], "2026-07-10");
 
-  assert.deepEqual(result.items.map((item) => item.id), ["CRV-API-VIDEO", "MED-API-IMAGE"]);
-  assert.deepEqual(result.items.map((item) => item.position), [1, 2]);
+  assert.deepEqual(result.items.map((item) => item.id), ["CRV-API-VIDEO", "CRV-GIF", "MED-API-IMAGE"]);
+  assert.deepEqual(result.items.map((item) => item.position), [1, 2, 3]);
   assert.equal(resolveDeviceMediaItem(result.items, "1")?.id, "CRV-API-VIDEO");
-  assert.equal(resolveDeviceMediaItem(result.items, "MED-API-IMAGE")?.position, 2);
-  assert.equal(resolveDeviceMediaItem(result.items, "3"), null);
+  assert.equal(resolveDeviceMediaItem(result.items, "CRV-GIF")?.mediaType, "image");
+  assert.equal(resolveDeviceMediaItem(result.items, "MED-API-IMAGE")?.position, 3);
+  assert.equal(resolveDeviceMediaItem(result.items, "4"), null);
 });

@@ -1,7 +1,7 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
 .toast-viewport {
-  z-index: 9999;
+  z-index: var(--z-toast);
   pointer-events: none;
   flex-direction: column;
   gap: 10px;
@@ -117,4 +117,3 @@ to {
 .toast-viewport {
   bottom: 92px;
 }
-

@@ -1,38 +1,56 @@
 "use client";
 
 import "./device-screen.css";
+import type { DeviceAlert } from "../data";
 import DeviceMediaCarousel, { DeviceMediaSlide } from "./device-media-carousel";
 import { DeviceTemplate } from "./device-templates";
 import { DeviceClock, PublicInfoPanel, TransitPanel, WeatherPanel } from "./device-widgets";
+import { useExpiringClock } from "./use-expiring-clock";
+import { FixedLocaleProvider, useI18n } from "../i18n/client";
+import type { Locale } from "../i18n/config";
 
-export default function DeviceScreen({
-  inventoryName,
-  city,
-  imageInterval,
-  slides,
-  template,
-  preview = false,
-  deviceId,
-}: {
+type DeviceScreenProps = {
   inventoryName: string;
   city: string;
   imageInterval: number;
   slides: DeviceMediaSlide[];
   template: DeviceTemplate;
   preview?: boolean;
-  deviceId?: string;
-}) {
+  displayLanguage?: Locale;
+  activeAlert?: DeviceAlert | null;
+};
+
+export default function DeviceScreen(props: DeviceScreenProps) {
+  const content = <DeviceScreenContent {...props} />;
+  return props.displayLanguage ? <FixedLocaleProvider locale={props.displayLanguage}>{content}</FixedLocaleProvider> : content;
+}
+
+function DeviceScreenContent({
+  inventoryName,
+  city,
+  imageInterval,
+  slides,
+  template,
+  preview = false,
+  displayLanguage,
+  activeAlert,
+}: DeviceScreenProps) {
+  const { t } = useI18n();
   const stopName = `${city} - ${inventoryName}`;
   const media = (
     <div className="device-region media">
-      <DeviceMediaCarousel inventoryName={inventoryName} imageInterval={imageInterval} slides={slides} />
+      <DeviceMediaCarousel inventoryName={inventoryName} imageInterval={imageInterval} slides={slides} interactive={preview} />
     </div>
   );
 
   const Root = preview ? "div" : "main";
+  const alertClock = useExpiringClock(activeAlert?.status === "active" ? [activeAlert.expiresAt] : []);
+  const showAlert = Boolean(activeAlert && activeAlert.status === "active" && Date.parse(activeAlert.expiresAt) > alertClock);
 
   return (
-    <Root className={`device-player${preview ? " device-player-preview" : ""} tpl-${template}`} aria-label={`${inventoryName} ${preview ? "display preview" : "media player"}`}>
+    <Root className={`device-player${preview ? " device-player-preview" : ""} tpl-${template}${showAlert ? " has-emergency-override" : ""}`} aria-label={`${inventoryName} ${t(preview ? "display preview" : "media player")}`} lang={displayLanguage}>
+      {showAlert && activeAlert ? <EmergencyAlertScreen alert={activeAlert} /> : null}
+      {!showAlert ? <>
       {template === "weather" ? (
         <>
           <aside className="device-region aside">
@@ -77,22 +95,24 @@ export default function DeviceScreen({
       ) : null}
 
       {template === "fullscreen" ? media : null}
-      {!preview && deviceId ? <DeviceApiGuide deviceId={deviceId} deviceName={inventoryName} mediaCount={slides.length} /> : null}
+      </> : null}
     </Root>
   );
 }
 
-function DeviceApiGuide({ deviceId, deviceName, mediaCount }: { deviceId: string; deviceName: string; mediaCount: number }) {
-  const apiPath = `/api/public/devices/${encodeURIComponent(deviceId)}/media`;
+function EmergencyAlertScreen({ alert }: { alert: DeviceAlert }) {
+  const { formatDate, t } = useI18n();
+  const typeLabel = alert.alertType === "amber" ? "AMBER Alert" : alert.alertType === "evacuation" ? "Evacuation notice" : "Public safety alert";
+  const expires = formatDate(alert.expiresAt, { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   return (
-    <aside className="device-api-guide" aria-label={`${deviceName} developer API`}>
-      <div className="device-api-heading">
-        <span>Developer API</span>
-        <strong>{deviceName}</strong>
-        <small>{mediaCount} active media item{mediaCount === 1 ? "" : "s"}</small>
+    <section className={`emergency-screen emergency-${alert.alertType}`} role="alert" aria-label={`${typeLabel}: ${alert.title}`}>
+      <header><span className="emergency-beacon" aria-hidden="true" /><strong>{t(typeLabel)}</strong><span>{t("Screen emergency override")}</span></header>
+      <div className="emergency-message">
+        <span className="emergency-area">{alert.area}</span>
+        <h1>{alert.title}</h1>
+        <p>{alert.message}</p>
       </div>
-      <a href={apiPath} target="_blank" rel="noreferrer"><code>GET {apiPath}</code></a>
-      <code>GET {apiPath}/{"{position-or-mediaId}"}</code>
-    </aside>
+      <footer><span>{t("Issued by {name}", { name: alert.issuedBy })}</span><span>{t("Display until {time}", { time: expires })}</span></footer>
+    </section>
   );
 }

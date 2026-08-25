@@ -3,6 +3,7 @@
 import "./async-button.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "./toast";
+import { useI18n } from "../i18n/client";
 
 type ActionState = "idle" | "pending" | "success" | "error";
 
@@ -28,6 +29,7 @@ export default function AsyncButton({
   disabled?: boolean;
   notify?: boolean;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type" | "disabled">) {
+  const { t } = useI18n();
   const [state, setState] = useState<ActionState>("idle");
   const resetTimer = useRef<number | undefined>(undefined);
   const mounted = useRef(true);
@@ -52,15 +54,15 @@ export default function AsyncButton({
       if (!mounted.current) return;
       if (result === false) {
         setState("error");
-        if (notify) toast.error(errorMessage ?? "That didn't work. Please try again.");
+        if (notify) toast.error(t(errorMessage ?? "That didn't work. Please try again."));
       } else {
         setState("success");
-        if (notify && successMessage) toast.success(successMessage);
+        if (notify && successMessage) toast.success(t(successMessage));
       }
     } catch (error) {
       if (!mounted.current) return;
       setState("error");
-      if (notify) toast.error(error instanceof Error && error.message ? error.message : errorMessage ?? "Something went wrong.");
+      if (notify) toast.error(t(error instanceof Error && error.message ? error.message : errorMessage ?? "Something went wrong."));
     } finally {
       if (mounted.current) scheduleReset();
     }
@@ -75,7 +77,7 @@ export default function AsyncButton({
       onClick={handleClick}
       {...rest}
     >
-      <span className="async-button-label">{children}</span>
+      <span className="async-button-label">{typeof children === "string" ? t(children) : children}</span>
       <span className="async-button-feedback" aria-hidden="true">
         {state === "pending" ? <span className="async-spinner" /> : null}
         {state === "success" ? <svg viewBox="0 0 24 24" className="async-icon"><path d="M5 13l4 4L19 7" /></svg> : null}

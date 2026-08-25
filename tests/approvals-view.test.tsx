@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import type { Booking, Creative, InventoryItem } from "../app/data";
+import type { Booking, Creative, InventoryItem, MediaResource } from "../app/data";
 import { ApprovalsView } from "../app/component/operator-views";
 
 const inventory: InventoryItem[] = [{
@@ -67,12 +67,48 @@ test("operator approvals render a preview for uploaded advertiser creative", () 
       bookings={bookings}
       inventory={inventory}
       creatives={creatives}
+      mediaResources={[]}
+      canReviewDeviceContent={false}
       approvalHistory={[]}
       hasConflict={() => false}
       updateBooking={vi.fn()}
+      updateMediaApproval={vi.fn()}
     />,
   );
 
   expect(screen.getByRole("img", { name: "Uploaded creative for Summer Iced Coffee" })).toHaveAttribute("src", "/media/CRV-APPROVAL-1");
   expect(screen.getByRole("link", { name: "Preview uploaded creative for Summer Iced Coffee" })).toHaveAttribute("href", "/media/CRV-APPROVAL-1");
+});
+
+test("institution approvals include delegated device content but not direct institution uploads", () => {
+  const pendingMedia: MediaResource = {
+    id: "MED-REVIEW-1",
+    inventoryId: inventory[0].id,
+    ownerId: "USR-DELEGATED",
+    title: "Transit closure notice",
+    originalName: "closure.png",
+    mimeType: "image/png",
+    mediaType: "image",
+    approvalStatus: "pending review",
+    sizeBytes: 200,
+    publicUrl: "/media/MED-REVIEW-1",
+    createdAt: "2026-07-02T00:00:00.000Z",
+  };
+  render(
+    <ApprovalsView
+      bookings={[]}
+      inventory={inventory}
+      creatives={[]}
+      mediaResources={[pendingMedia, { ...pendingMedia, id: "MED-DIRECT", title: "Direct notice", approvalStatus: "approved" }]}
+      canReviewDeviceContent
+      approvalHistory={[]}
+      hasConflict={() => false}
+      updateBooking={vi.fn()}
+      updateMediaApproval={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText("Transit closure notice")).toBeInTheDocument();
+  expect(screen.queryByText("Direct notice")).not.toBeInTheDocument();
+  expect(screen.getByText(/Institution-owned uploads bypass this queue/)).toBeInTheDocument();
 });

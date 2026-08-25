@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
+import { canDirectPublishInstitutionContent, canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
 import { createMediaResource, getInventory, listMediaResources } from "../../../../lib/db";
 import { deleteStoredMedia, storeMedia } from "../../../../lib/media-storage";
 import { inspectMediaUpload } from "../../../../lib/uploads";
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       originalName,
       mimeType: upload.mimeType,
       mediaType: upload.mediaType,
+      approvalStatus: canDirectPublishInstitutionContent(user, inventory) ? "approved" : "pending review",
       sizeBytes: upload.bytes.byteLength,
       publicUrl: `/media/${resourceId}`,
       createdAt: new Date().toISOString(),
@@ -58,5 +59,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     throw error;
   }
 
-  return NextResponse.json({ resource }, { status: 201 });
+  return NextResponse.json({
+    resource,
+    publishing: resource.approvalStatus === "approved"
+      ? { approvalRequired: false, status: inventory.approvalStatus === "approved" ? "published" : "ready" }
+      : { approvalRequired: true, status: "pending review" },
+  }, { status: 201 });
 }

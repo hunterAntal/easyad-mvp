@@ -10,6 +10,10 @@ import PreciseLocationPicker from "./precise-location-picker";
 import { deviceTemplates } from "./device-templates";
 import AsyncButton from "./async-button";
 import { toast } from "./toast";
+import { useI18n } from "../i18n/client";
+import { localeNames, locales } from "../i18n/config";
+import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
+import { inventoryAvailabilityLabel, isValidAvailabilityWindow } from "../lib/inventory-availability";
 
 export function InventoryView({
   inventory,
@@ -42,6 +46,7 @@ export function InventoryView({
   canManage: boolean;
   canDelete: boolean;
 }) {
+  const { locale, t } = useI18n();
   const [formItem, setFormItem] = useState<InventoryItem>(item);
   const [isCreating, setIsCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,6 +67,12 @@ export function InventoryView({
 
   async function submitInventory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isValidAvailabilityWindow(formItem)) {
+      const message = "Choose a valid availability start and end date.";
+      setSaveError(message);
+      toast.error(message);
+      return;
+    }
     setSaving(true);
     setSaveError("");
     try {
@@ -87,36 +98,40 @@ export function InventoryView({
         <PanelHeading
           eyebrow="Centralized inventory database"
           title="Devices and inventory"
-          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setSaveError(""); }}>Add device</button> : <a className="primary-button" href="/login">Sign in to manage</a>}
+          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setSaveError(""); }}>{t("Add device")}</button> : <a className="primary-button" href="/login">{t("Sign in to manage")}</a>}
         />
         {hasInventory ? <div className="inventory-table inventory-management-table">
-          <div className="table-head inventory-management-head"><span>Unit</span><span>Operator</span><span>Format</span><span>Rate</span><span>Occupancy</span><span>Availability</span><span>Publish state</span></div>
-          {inventory.map((unit) => (
-            <button className={`table-row ${selectedId === unit.id ? "selected" : ""}`} key={unit.id} onClick={() => { setIsCreating(false); setSaveError(""); select(unit.id); }}>
-              <span><strong>{unit.name}</strong><small>{unit.address}</small>{unit.tags?.length ? <small>{unit.tags.join(", ")}</small> : null}</span>
-              <span>{unit.operator}</span>
-              <span>{formats[unit.format].label}</span>
-              <span>{money(unit.price)}</span>
-              <span><Meter value={unit.occupancy} />{unit.occupancy}%</span>
-              <span>{unit.availableFrom}<small>{unit.availableTo}</small></span>
-              <span><span className={`status ${unit.approvalStatus === "approved" ? "good" : unit.approvalStatus === "rejected" ? "bad" : ""}`}>{unit.approvalStatus ?? "approved"}</span></span>
-            </button>
-          ))}
-        </div> : <div className="empty-state"><strong>No inventory records yet</strong><span>Add a device to configure its inventory record and upload public media resources.</span></div>}
+          <div className="table-head inventory-management-head"><span>{t("Unit")}</span><span>{t("Operator")}</span><span>{t("Format")}</span><span>{t("Rate")}</span><span>{t("Occupancy")}</span><span>{t("Availability")}</span><span>{t("Status")}</span></div>
+          {inventory.map((unit) => {
+            const staticInventory = isStaticInventory(unit);
+            const availability = inventoryAvailabilityLabel(unit);
+            return (
+              <button className={`table-row ${selectedId === unit.id ? "selected" : ""}`} key={unit.id} onClick={() => { setIsCreating(false); setSaveError(""); select(unit.id); }}>
+                <span><strong>{unit.name}</strong><small>{unit.address}</small>{unit.tags?.length ? <small>{unit.tags.join(", ")}</small> : null}</span>
+                <span>{unit.operator}</span>
+                <span><span className="status">{t(unit.deliveryMode === "static" ? "Static" : unit.deliveryMode === "digital" ? "Digital" : "Delivery mode pending")}</span><small>{t(formats[unit.format].label)}</small></span>
+                <span>{money(unit.price, locale)}</span>
+                <span><Meter value={unit.occupancy} />{unit.occupancy}%</span>
+                <span>{unit.availableFrom}<small>{unit.availableTo}</small></span>
+                <span><span className={`status ${staticInventory ? availability === "Available" ? "good" : "bad" : unit.approvalStatus === "approved" ? "good" : unit.approvalStatus === "rejected" ? "bad" : ""}`}>{t(staticInventory ? availability : unit.approvalStatus ?? "approved")}</span></span>
+              </button>
+            );
+          })}
+        </div> : <div className="empty-state"><strong>{t("No inventory records yet")}</strong><span>{t("Add a device to configure its inventory record and upload public media resources.")}</span></div>}
       </div>
       {canDelete ? <div className="panel span-2">
         <PanelHeading eyebrow="Publishing workflow" title="Inventory approvals" />
         <div className="approval-list">
           {pendingInventory.length ? pendingInventory.map((unit) => (
             <div className="approval-card" key={unit.id}>
-              <div><span className="eyebrow">{unit.operator}</span><strong>{unit.name}</strong><small>{unit.address} - {formats[unit.format].label}</small></div>
-              <span className="status">pending approval</span>
+              <div><span className="eyebrow">{unit.operator}</span><strong>{unit.name}</strong><small>{unit.address} - {t(formats[unit.format].label)}</small></div>
+              <span className="status">{t("pending approval")}</span>
               <div className="approval-actions">
                 <AsyncButton onClick={() => updateInventoryApproval(unit.id, "approved")} successMessage={`${unit.name} published.`} errorMessage="Could not publish this device.">Publish</AsyncButton>
                 <AsyncButton onClick={() => updateInventoryApproval(unit.id, "rejected")} successMessage={`${unit.name} rejected.`} errorMessage="Could not reject this device.">Reject</AsyncButton>
               </div>
             </div>
-          )) : <div className="empty-state"><strong>No inventory awaiting review</strong><span>Operator-created devices appear here before they are published.</span></div>}
+          )) : <div className="empty-state"><strong>{t("No inventory awaiting review")}</strong><span>{t("Operator-created devices appear here before they are published.")}</span></div>}
         </div>
       </div> : null}
       {showDevicePanels ? <>
@@ -126,29 +141,39 @@ export function InventoryView({
           title={isCreating ? "New inventory device" : item.name}
           action={canManage ? (
             <div className="inventory-draft-actions">
-              <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem(isCreating ? { ...newItem } : { ...item }); setIsCreating(false); setSaveError(""); }}>Cancel</button>
-              {!isCreating && canDelete ? <button className="danger-button" type="button" onClick={deleteInventory}>Delete</button> : null}
-              <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" form="inventory-device-form" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{isCreating ? "Creating..." : "Saving..."}</span> : justSaved ? "Saved" : (isCreating ? "Create device" : "Save changes")}</button>
+              <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem(isCreating ? { ...newItem } : { ...item }); setIsCreating(false); setSaveError(""); }}>{t("Cancel")}</button>
+              {!isCreating && canDelete ? <button className="danger-button" type="button" onClick={deleteInventory}>{t("Delete")}</button> : null}
+              <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" form="inventory-device-form" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t(isCreating ? "Creating..." : "Saving...")}</span> : t(justSaved ? "Saved" : (isCreating ? "Create device" : "Save changes"))}</button>
             </div>
           ) : undefined}
         />
-        {!isCreating ? <div className="public-url-box">
-          <span className="eyebrow">Public device URLs</span>
+        {!isCreating && isDigitalInventory(item) ? <div className="public-url-box">
+          <span className="eyebrow">{t("Public device URLs")}</span>
           <a href={`/devices/${item.id}`} target="_blank" rel="noreferrer">/devices/{item.id}</a>
           <a href={`/inventory/${item.id}`} target="_blank" rel="noreferrer">/inventory/{item.id}</a>
         </div> : null}
-        <form id="inventory-device-form" onSubmit={submitInventory}>
+        <form id="inventory-device-form" noValidate onSubmit={submitInventory}>
+          {isStaticInventory(editorItem) ? <div className={`decision-banner ${inventoryAvailabilityLabel(editorItem) === "Available" ? "good" : "bad"}`}>
+            <strong>{t("Physical billboard status")}: {t(inventoryAvailabilityLabel(editorItem))}</strong>
+            <span>{t("This status is calculated from the availability dates below.")}</span>
+          </div> : null}
           <div className="form-grid compact">
             <EditorInput label="Name" value={editorItem.name} disabled={!canManage || saving} onChange={(value) => updateField("name", value)} />
             <EditorInput label="Operator" value={editorItem.operator} disabled={!canManage || saving} onChange={(value) => updateField("operator", value)} />
             <EditorInput label="Address" value={editorItem.address} disabled={!canManage || saving} onChange={(value) => updateField("address", value)} />
-            <label>Format<select className="select" disabled={!canManage || saving} value={editorItem.format} onChange={(event) => updateField("format", event.target.value)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{formats[key].label}</option>)}</select></label>
-            <label>Display template<select className="select" disabled={!canManage || saving} value={editorItem.displayTemplate ?? "fullscreen"} onChange={(event) => updateField("displayTemplate", event.target.value)}>{deviceTemplates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label>
-            <label className="check-row"><input type="checkbox" checked={editorItem.commentsEnabled !== false} disabled={!canManage || saving} onChange={(event) => updateField("commentsEnabled", event.target.checked)} />Show visitor comments on the map place panel</label>
+            <label>{t("Format")}<select className="select" disabled={!canManage || saving} value={editorItem.format} onChange={(event) => updateField("format", event.target.value)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>
+            <label>{t("Delivery mode")}<select className="select" disabled={!canManage || saving} value={editorItem.deliveryMode ?? "unknown"} onChange={(event) => updateField("deliveryMode", event.target.value)}><option value="digital">{t("Digital")}</option><option value="static">{t("Static")}</option><option value="unknown">{t("Needs classification")}</option></select></label>
+            <EditorInput label="Product type" value={editorItem.productType ?? editorItem.format} disabled={!canManage || saving} onChange={(value) => updateField("productType", value)} />
+            <EditorInput label="Production lead time (days)" type="number" value={editorItem.productionLeadDays ?? 0} disabled={!canManage || saving} onChange={(value) => updateField("productionLeadDays", Math.max(0, Number(value)))} />
+            <EditorInput label="Installation lead time (days)" type="number" value={editorItem.installationLeadDays ?? 0} disabled={!canManage || saving} onChange={(value) => updateField("installationLeadDays", Math.max(0, Number(value)))} />
+            {editorItem.deliveryMode === "static" && !isCreating ? <a className="secondary-button" href={`/api/inventory/${editorItem.id}/specifications`} target="_blank" rel="noreferrer">{t("Download production specifications")}</a> : null}
+            <label>{t("Display template")}<select className="select" disabled={!canManage || saving} value={editorItem.displayTemplate ?? "fullscreen"} onChange={(event) => updateField("displayTemplate", event.target.value)}>{deviceTemplates.map((template) => <option key={template.id} value={template.id}>{t(template.label)}</option>)}</select></label>
+            <label>{t("Device display language")}<select aria-describedby="device-display-language-help" aria-label={t("Device display language")} className="select" disabled={!canManage || saving} value={editorItem.displayLanguage ?? "en"} onChange={(event) => updateField("displayLanguage", event.target.value)}>{locales.map((option) => <option key={option} value={option}>{localeNames[option]}</option>)}</select><small id="device-display-language-help">{t("Controls only the public device display. Website language stays unchanged.")}</small></label>
+            <label className="check-row"><input type="checkbox" checked={editorItem.commentsEnabled !== false} disabled={!canManage || saving} onChange={(event) => updateField("commentsEnabled", event.target.checked)} />{t("Show visitor comments on the map place panel")}</label>
             <EditorInput label="Map position X" type="number" value={editorItem.x} disabled={!canManage || saving} onChange={(value) => updateField("x", Number(value))} />
             <EditorInput label="Map position Y" type="number" value={editorItem.y} disabled={!canManage || saving} onChange={(value) => updateField("y", Number(value))} />
             <div className="inventory-location-picker">
-              <span className="field-label">Device location</span>
+              <span className="field-label">{t("Device location")}</span>
               <PreciseLocationPicker point={{ x: editorItem.x, y: editorItem.y }} onChange={(point) => { updateField("x", roundCoordinate(point.x)); updateField("y", roundCoordinate(point.y)); }} />
             </div>
             <EditorInput label="Daily rate" type="number" value={editorItem.price} disabled={!canManage || saving} onChange={(value) => updateField("price", Number(value))} />
@@ -156,19 +181,18 @@ export function InventoryView({
             <EditorInput label="Traffic" type="number" value={editorItem.traffic} disabled={!canManage || saving} onChange={(value) => updateField("traffic", Number(value))} />
             <EditorInput label="Audience" value={editorItem.audience} disabled={!canManage || saving} onChange={(value) => updateField("audience", value)} />
             <TagEditor tags={editorItem.tags ?? []} disabled={!canManage || saving} onChange={(tags) => updateField("tags", tags)} />
-            <label>Competitor density<select className="select" disabled={!canManage || saving} value={editorItem.competitor} onChange={(event) => updateField("competitor", event.target.value)}>{["Low", "Medium", "High"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label>{t("Competitor density")}<select className="select" disabled={!canManage || saving} value={editorItem.competitor} onChange={(event) => updateField("competitor", event.target.value)}>{["Low", "Medium", "High"].map((value) => <option key={value} value={value}>{t(value)}</option>)}</select></label>
             <EditorInput label="Occupancy (%)" type="number" value={editorItem.occupancy} disabled={!canManage || saving} onChange={(value) => updateField("occupancy", Number(value))} />
-            <EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={!canManage || saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} />
-            <EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={!canManage || saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} />
+            {editorItem.deliveryMode === "digital" ? <><EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={!canManage || saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} /><EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={!canManage || saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} /></> : null}
             <EditorInput label="Availability start" type="date" value={editorItem.availableFrom} disabled={!canManage || saving} onChange={(value) => updateField("availableFrom", value)} />
             <EditorInput label="Availability end" type="date" value={editorItem.availableTo} disabled={!canManage || saving} onChange={(value) => updateField("availableTo", value)} />
           </div>
-          {saveError ? <span className="form-error">{saveError}</span> : null}
+          {saveError ? <span className="form-error">{t(saveError)}</span> : null}
         </form>
       </div>
       <div className="panel">
         <PanelHeading eyebrow="Public media resources" title="Images and videos" />
-        {canManage ? <MediaUploadForm uploadMedia={uploadMedia} /> : <div className="empty">Sign in as an operator or super admin to upload resources.</div>}
+        {canManage ? <MediaUploadForm uploadMedia={uploadMedia} /> : <div className="empty">{t("Sign in as an operator or super admin to upload resources.")}</div>}
         <div className="media-list">
           {mediaResources.length ? mediaResources.map((resource) => (
             <div className="media-card" key={resource.id}>
@@ -182,15 +206,15 @@ export function InventoryView({
                 <span>{resource.originalName}</span>
                 <a href={resource.publicUrl} target="_blank" rel="noreferrer">{resource.publicUrl}</a>
               </div>
-              {canDelete ? <button className="danger-button" onClick={() => void deleteMediaResource(resource.id)}>Delete</button> : null}
+              {canDelete ? <button className="danger-button" onClick={() => void deleteMediaResource(resource.id)}>{t("Delete")}</button> : null}
             </div>
-          )) : <div className="empty">No uploaded resources yet.</div>}
+          )) : <div className="empty">{t("No uploaded resources yet.")}</div>}
         </div>
       </div>
       </> : <div className="panel span-2">
         <div className="empty-state">
-          <strong>Add a device first</strong>
-          <span>Create an inventory device before configuring its record or uploading public media resources.</span>
+          <strong>{t("Add a device first")}</strong>
+          <span>{t("Create an inventory device before configuring its record or uploading public media resources.")}</span>
         </div>
       </div>}
     </section>
@@ -217,6 +241,7 @@ const suggestedDeviceTags = [
 ];
 
 function TagEditor({ tags, disabled, onChange }: { tags: string[]; disabled: boolean; onChange: (tags: string[]) => void }) {
+  const { t } = useI18n();
   const [customTag, setCustomTag] = useState("");
   const normalizedTags = tags ?? [];
 
@@ -234,15 +259,15 @@ function TagEditor({ tags, disabled, onChange }: { tags: string[]; disabled: boo
 
   return (
     <div className="tag-editor">
-      <span className="field-label">Device tags</span>
+      <span className="field-label">{t("Device tags")}</span>
       <div className="tag-options">
-        {suggestedDeviceTags.map((tag) => <button className={`tag-chip ${normalizedTags.includes(tag) ? "selected" : ""}`} key={tag} type="button" disabled={disabled} onClick={() => toggleTag(tag)}>{tag}</button>)}
+        {suggestedDeviceTags.map((tag) => <button className={`tag-chip ${normalizedTags.includes(tag) ? "selected" : ""}`} key={tag} type="button" disabled={disabled} onClick={() => toggleTag(tag)}>{t(tag)}</button>)}
       </div>
       <div className="tag-custom-input">
-        <input aria-label="Custom device tag" disabled={disabled} value={customTag} placeholder="Custom tag" onChange={(event) => setCustomTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomTag(); } }} />
-        <button className="secondary-button" type="button" disabled={disabled || !customTag.trim()} onClick={addCustomTag}>Add tag</button>
+        <input aria-label={t("Custom device tag")} disabled={disabled} value={customTag} placeholder={t("Custom tag")} onChange={(event) => setCustomTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); addCustomTag(); } }} />
+        <button className="secondary-button" type="button" disabled={disabled || !customTag.trim()} onClick={addCustomTag}>{t("Add tag")}</button>
       </div>
-      {normalizedTags.length ? <div className="tag-selection">{normalizedTags.map((tag) => <button key={tag} className="tag-chip selected" type="button" disabled={disabled} onClick={() => toggleTag(tag)}>{tag} x</button>)}</div> : null}
+      {normalizedTags.length ? <div className="tag-selection">{normalizedTags.map((tag) => <button key={tag} className="tag-chip selected" type="button" disabled={disabled} onClick={() => toggleTag(tag)}>{t(tag)} x</button>)}</div> : null}
     </div>
   );
 }
@@ -250,6 +275,7 @@ function TagEditor({ tags, disabled, onChange }: { tags: string[]; disabled: boo
 const maxUploadBytes = 50 * 1024 * 1024;
 
 function MediaUploadForm({ uploadMedia }: { uploadMedia: (file: File, title: string) => Promise<boolean> }) {
+  const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -287,22 +313,23 @@ function MediaUploadForm({ uploadMedia }: { uploadMedia: (file: File, title: str
   }
 
   return (
-    <form className="media-upload" onSubmit={submit}>
-      <label>Resource title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Lobby screen loop" /></label>
-      <label>Image or video<input name="file" type="file" accept="image/*,video/*" required /></label>
-      {error ? <span className="form-error">{error}</span> : null}
-      <button className="primary-button" disabled={busy} type="submit">{busy ? "Uploading..." : "Upload resource"}</button>
+    <form className="media-upload" noValidate onSubmit={submit}>
+      <label>{t("Resource title")}<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("Lobby screen loop")} /></label>
+      <label>{t("Image or video")}<input name="file" type="file" accept="image/*,video/*" required /></label>
+      {error ? <span className="form-error">{t(error)}</span> : null}
+      <button className="primary-button" disabled={busy} type="submit">{t(busy ? "Uploading..." : "Upload resource")}</button>
     </form>
   );
 }
 
 export function CalendarView({ inventory, bookings }: { inventory: InventoryItem[]; bookings: Booking[] }) {
-  const weeks = ["Jun 22", "Jun 29", "Jul 6", "Jul 13", "Jul 20", "Jul 27", "Aug 3", "Aug 10"];
+  const { formatDate, t } = useI18n();
+  const weeks = Array.from({ length: 8 }, (_, index) => new Date(2026, 5, 22 + index * 7));
   return (
     <section className="panel">
       <PanelHeading eyebrow="Calendar and availability" title="Campaign schedule" />
       <div className="calendar">
-        <div className="calendar-head"><span>Inventory</span>{weeks.map((week) => <span key={week}>{week}</span>)}</div>
+        <div className="calendar-head"><span>{t("Inventory")}</span>{weeks.map((week) => <span key={week.toISOString()}>{formatDate(week, { month: "short", day: "numeric" })}</span>)}</div>
         {inventory.map((item) => <div className="calendar-row" key={item.id}><strong>{item.name}</strong>{weeks.map((_, index) => <CalendarCell item={item} index={index} bookings={bookings} key={index} />)}</div>)}
       </div>
     </section>
@@ -313,24 +340,33 @@ export function ApprovalsView({
   bookings,
   inventory,
   creatives,
+  mediaResources,
+  canReviewDeviceContent,
   approvalHistory,
   hasConflict,
   updateBooking,
+  updateMediaApproval,
 }: {
   bookings: Booking[];
   inventory: InventoryItem[];
   creatives: Creative[];
+  mediaResources: MediaResource[];
+  canReviewDeviceContent: boolean;
   approvalHistory: ApprovalEvent[];
   hasConflict: (inventoryId: string, start: string, end: string, excludeId?: string) => boolean;
   updateBooking: (id: string, updates: Partial<Booking>) => Promise<boolean>;
+  updateMediaApproval: (id: string, approvalStatus: Extract<MediaResource["approvalStatus"], "approved" | "rejected">) => Promise<boolean>;
 }) {
+  const { formatDate, t } = useI18n();
   const pending = bookings.filter((booking) => ["pending approval", "creative review"].includes(booking.status));
+  const pendingDeviceMedia = canReviewDeviceContent ? mediaResources.filter((resource) => resource.approvalStatus === "pending review") : [];
   return (
     <section className="grid approvals-grid">
       <div className="panel span-2">
         <PanelHeading eyebrow="Operator workflow" title="Approvals" />
         <div className="approval-list">
-          {pending.length ? pending.map((booking) => {
+          {pending.length || pendingDeviceMedia.length ? <>
+          {pending.map((booking) => {
             const item = inventory.find((unit) => unit.id === booking.inventoryId) ?? inventory[0];
             const conflict = hasConflict(booking.inventoryId, booking.start, booking.end, booking.id);
             const creative = creatives.find((entry) => entry.bookingId === booking.id);
@@ -339,26 +375,26 @@ export function ApprovalsView({
                 <div>
                   <span className="eyebrow">{booking.advertiser}</span>
                   <strong>{booking.campaign}</strong>
-                  <small>{item.name} - {booking.start} to {booking.end}</small>
-                  <small>{booking.adSlots} ad slot{booking.adSlots === 1 ? "" : "s"} reserved for this device loop</small>
-                  <small>{creative ? `Creative: ${creative.source === "upload" ? creative.originalName ?? "Uploaded media" : capitalize(creative.template)} ${creative.width}x${creative.height} ${creative.fileType.toUpperCase()}` : "Creative: not submitted yet"}</small>
-                  {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">Open uploaded media</a></small> : null}
+                  <small>{item.name} - {booking.start} {t("to")} {booking.end}</small>
+                  <small>{t(booking.adSlots === 1 ? "{count} ad slot reserved for this device loop" : "{count} ad slots reserved for this device loop", { count: booking.adSlots })}</small>
+                  <small>{creative ? t("Creative: {source} {width}x{height} {type}", { source: creative.source === "upload" ? creative.originalName ?? t("Uploaded media") : t(capitalize(creative.template)), width: creative.width, height: creative.height, type: creative.fileType.toUpperCase() }) : t("Creative: not submitted yet")}</small>
+                  {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a></small> : null}
                 </div>
                 {creative?.publicUrl ? (
-                  <a className="approval-creative-preview" href={creative.publicUrl} target="_blank" rel="noreferrer" aria-label={`Preview uploaded creative for ${booking.campaign}`}>
+                  <a className="approval-creative-preview" href={creative.publicUrl} target="_blank" rel="noreferrer" aria-label={t("Preview uploaded creative for {campaign}", { campaign: booking.campaign })}>
                     {creative.mimeType?.startsWith("video/") ? (
                       <video muted playsInline preload="metadata" src={creative.publicUrl} />
                     ) : (
-                      <img src={creative.publicUrl} alt={`Uploaded creative for ${booking.campaign}`} loading="lazy" />
+                      <img src={creative.publicUrl} alt={t("Uploaded creative for {campaign}", { campaign: booking.campaign })} loading="lazy" />
                     )}
-                    <span>Preview media</span>
+                    <span>{t("Preview media")}</span>
                   </a>
                 ) : null}
-                <span className={`status ${conflict ? "bad" : "good"}`}>{conflict ? "Over capacity" : "Clear"}</span>
-                <span className="status">{booking.creativeStatus}</span>
+                <span className={`status ${conflict ? "bad" : "good"}`}>{t(conflict ? "Over capacity" : "Clear")}</span>
+                <span className="status">{t(booking.creativeStatus)}</span>
                 <div className="approval-actions">
                   {conflict ? (
-                    <span className="disabled-action">Approve</span>
+                    <span className="disabled-action">{t("Approve")}</span>
                   ) : (
                     <AsyncButton onClick={() => updateBooking(booking.id, { status: "approved", creativeStatus: "approved" })} successMessage={`${booking.campaign} approved.`} errorMessage="Could not approve this campaign.">Approve</AsyncButton>
                   )}
@@ -366,10 +402,33 @@ export function ApprovalsView({
                 </div>
               </div>
             );
-          }) : (
+          })}
+          {pendingDeviceMedia.map((resource) => {
+            const device = inventory.find((unit) => unit.id === resource.inventoryId);
+            return (
+              <div className="approval-card has-creative-preview" key={resource.id}>
+                <div>
+                  <span className="eyebrow">{t("Operator-submitted device content")}</span>
+                  <strong>{resource.title}</strong>
+                  <small>{device?.name ?? resource.inventoryId} - {resource.originalName}</small>
+                  <small>{t("Institution-owned uploads bypass this queue; delegated operator uploads require review.")}</small>
+                </div>
+                <a className="approval-creative-preview" href={resource.publicUrl} target="_blank" rel="noreferrer" aria-label={t("Preview device content {title}", { title: resource.title })}>
+                  {resource.mediaType === "video" ? <video muted playsInline preload="metadata" src={resource.publicUrl} /> : <img src={resource.publicUrl} alt={t("Submitted device content {title}", { title: resource.title })} loading="lazy" />}
+                  <span>{t("Preview media")}</span>
+                </a>
+                <span className="status">{t("pending review")}</span>
+                <div className="approval-actions">
+                  <AsyncButton onClick={() => updateMediaApproval(resource.id, "approved")} successMessage={`${resource.title} approved.`} errorMessage="Could not approve this content.">Approve</AsyncButton>
+                  <AsyncButton onClick={() => updateMediaApproval(resource.id, "rejected")} successMessage={`${resource.title} rejected.`} errorMessage="Could not reject this content.">Reject</AsyncButton>
+                </div>
+              </div>
+            );
+          })}
+          </> : (
             <div className="empty-state">
-              <strong>No approvals waiting</strong>
-              <span>Approved or rejected campaigns move out of this queue.</span>
+              <strong>{t("No approvals waiting")}</strong>
+              <span>{t("Approved or rejected campaigns and delegated device content move out of this queue.")}</span>
             </div>
           )}
         </div>
@@ -379,25 +438,26 @@ export function ApprovalsView({
         <div className="approval-history">
           {approvalHistory.length ? approvalHistory.map((event) => (
             <div className="approval-history-row" key={event.id}>
-              <span className={`status ${event.action === "approved" ? "good" : "bad"}`}>{event.action}</span>
+              <span className={`status ${event.action === "approved" ? "good" : "bad"}`}>{t(event.action)}</span>
               <span><strong>{event.campaign}</strong><small>{event.bookingId} - {event.inventoryId}</small></span>
-              <span>{event.previousStatus}<small>to {event.nextStatus}</small></span>
-              <span>{event.actorName}<small>{new Date(event.createdAt).toLocaleString()}</small></span>
+              <span>{t(event.previousStatus)}<small>{t("to")} {t(event.nextStatus)}</small></span>
+              <span>{event.actorName}<small>{formatDate(event.createdAt, { dateStyle: "medium", timeStyle: "short" })}</small></span>
             </div>
           )) : (
-            <div className="empty-state"><strong>No approval history yet</strong><span>Approved and rejected campaigns will appear here for tracking.</span></div>
+            <div className="empty-state"><strong>{t("No approval history yet")}</strong><span>{t("Approved and rejected campaigns will appear here for tracking.")}</span></div>
           )}
         </div>
       </div>
-      <div className="panel"><PanelHeading eyebrow="Automation" title="Controls" /><div className="automation-list"><div><strong>Capacity prevention</strong><span>Blocks reservations only when overlapping loop seconds exceed the device maximum.</span></div><div><strong>Creative gate</strong><span>Requires approved dimensions, safe zone, file type, and distortion checks.</span></div><div><strong>Billing state</strong><span>Creates invoice-ready spend and revenue split records.</span></div></div></div>
+      <div className="panel"><PanelHeading eyebrow="Automation" title="Controls" /><div className="automation-list"><div><strong>{t("Capacity prevention")}</strong><span>{t("Blocks reservations only when overlapping loop seconds exceed the device maximum.")}</span></div><div><strong>{t("Creative gate")}</strong><span>{t("Requires approved dimensions, safe zone, file type, and distortion checks.")}</span></div><div><strong>{t("Billing state")}</strong><span>{t("Creates invoice-ready spend and revenue split records.")}</span></div></div></div>
     </section>
   );
 }
 
 function CalendarCell({ item, index, bookings }: { item: InventoryItem; index: number; bookings: Booking[] }) {
+  const { t } = useI18n();
   const weekStart = new Date(2026, 5, 22 + index * 7);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const booking = bookings.find((entry) => entry.inventoryId === item.id && overlaps(toDate(weekStart), toDate(weekEnd), entry.start, entry.end));
-  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{booking ? booking.status.split(" ")[0] : "Open"}</span>;
+  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? booking.status.split(" ")[0] : "Available")}</span>;
 }

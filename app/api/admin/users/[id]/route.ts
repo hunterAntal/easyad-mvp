@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (role === "operator") {
     const resolvedInstitutionId = institutionId ?? current?.institutionId;
     const institution = resolvedInstitutionId ? await getUserById(resolvedInstitutionId) : null;
-    if (!institution || institution.role !== "institutional") return NextResponse.json({ error: "Operators must be assigned to an institutional account" }, { status: 400 });
+    if (!institution || institution.role !== "institutional") return NextResponse.json({ error: "Operators must be assigned to an institution account" }, { status: 400 });
   }
 
   const user = await updateManagedUser(id, { role, status, institutionId, operatorLimit });

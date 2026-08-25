@@ -85,7 +85,7 @@ export function validateCreative(draft: CreativeDraft) {
   const spec = formats[draft.format];
   const ratio = draft.width / draft.height;
   const ratioDelta = Math.abs(ratio - spec.ratio) / spec.ratio;
-  const allowedTypes = draft.format === "digital" ? ["png", "jpg", "mp4"] : ["png", "jpg", "pdf"];
+  const allowedTypes = draft.format === "digital" ? ["png", "jpg", "gif", "mp4"] : ["png", "jpg", "pdf"];
   return [
     { label: "Aspect ratio", ok: ratioDelta < 0.025, message: `Expected ${formatRatio(spec.ratio)}, received ${formatRatio(ratio)}.` },
     { label: "Safe zone", ok: draft.safeZone >= spec.safeZone, message: `Requires at least ${spec.safeZone}% margin for this format.` },
@@ -95,12 +95,12 @@ export function validateCreative(draft: CreativeDraft) {
   ];
 }
 
-export function money(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+export function money(value: number, locale: "en" | "fr" = "en") {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(value);
 }
 
-export function number(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
+export function number(value: number, locale: "en" | "fr" = "en") {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA").format(value);
 }
 
 export function daysBetween(start: string, end: string) {

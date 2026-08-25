@@ -5,10 +5,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { ArrowUpRight } from "lucide-react";
 import { INTRO_COOKIE_MAX_AGE, INTRO_COOKIE_NAME } from "../lib/preferences";
+import { useI18n } from "../i18n/client";
+import { mapLibreLocale } from "../i18n/maplibre";
 
 const torontoCenter: [number, number] = [-79.3832, 43.6532];
 
 export default function TorontoStarter({ show, children }: { show: boolean; children: ReactNode }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(show);
   const [leaving, setLeaving] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -30,38 +33,39 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
 
   if (!visible) return children;
 
-  return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label="Ad campaign starter">
+  return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label={t("Ad campaign starter")}>
     <TorontoThreeDimensionalMap />
     <div className="toronto-map-wash" aria-hidden="true" />
     <header className="toronto-starter-brand">
-      <strong>OOH / Canada</strong>
-      <span>Interactive campaign canvas</span>
+      <strong>{t("EasyAD Platform")}</strong>
+      <span>{t("Interactive campaign canvas")}</span>
     </header>
-    <section className="toronto-starter-action" aria-label="Enter campaign portal">
-      <p className="starter-eyebrow"><i aria-hidden="true" />Next-gen OOH marketing platform</p>
-      <h1>The city is your <em>canvas.</em></h1>
-      <p className="starter-sub">Plan, book, and verify out-of-home campaigns across Canada — from geospatial discovery to proof-of-play, in one workspace.</p>
+    <section className="toronto-starter-action" aria-label={t("Enter campaign portal")}>
+      <p className="starter-eyebrow"><i aria-hidden="true" />{t("Next-gen OOH marketing platform")}</p>
+      <h1>{t("The city is your")} <em>{t("canvas.")}</em></h1>
+      <p className="starter-sub">{t("Plan, book, and verify out-of-home campaigns across Canada — from geospatial discovery to proof-of-play, in one workspace.")}</p>
       <div className="starter-cta-row">
         <button type="button" onClick={enterPortal}>
-          <span>Start my campaign</span>
+          <span>{t("Start my campaign")}</span>
           <i className="starter-cta-arrow" aria-hidden="true"><ArrowUpRight /></i>
         </button>
-        <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>Don&apos;t show this screen again</span></label>
+        <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>{t("Don't show this screen again")}</span></label>
       </div>
-      <ul className="starter-features" aria-label="Platform capabilities">
-        <li>Geospatial discovery</li>
-        <li>Creative validation</li>
-        <li>Proof-of-play</li>
+      <ul className="starter-features" aria-label={t("Platform capabilities")}>
+        <li>{t("Geospatial discovery")}</li>
+        <li>{t("Creative validation")}</li>
+        <li>{t("Proof-of-play")}</li>
       </ul>
     </section>
     <footer className="toronto-starter-meta">
       <span>43.6532 N / 79.3832 W</span>
-      <span>Toronto building geometry / OpenStreetMap</span>
+      <span>{t("Toronto building geometry / OpenStreetMap")}</span>
     </footer>
   </main>;
 }
 
 function TorontoThreeDimensionalMap() {
+  const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -80,6 +84,7 @@ function TorontoThreeDimensionalMap() {
         canvasContextAttributes: { antialias: true },
         maxPitch: 82,
         attributionControl: false,
+        locale: mapLibreLocale(locale),
       });
     } catch {
       setStatus("error");
@@ -101,12 +106,12 @@ function TorontoThreeDimensionalMap() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [locale]);
 
   return <div className={`toronto-map status-${status}`}>
-    <div ref={containerRef} className="toronto-map-canvas" role="application" aria-label="Interactive 3D map of downtown Toronto" />
-    {status === "loading" ? <div className="toronto-map-loader"><i /><span>Assembling Toronto</span></div> : null}
-    {status === "error" ? <div className="toronto-map-fallback"><span>Toronto</span><small>Interactive map data needs an internet connection.</small></div> : null}
+    <div ref={containerRef} className="toronto-map-canvas" role="application" aria-label={t("Interactive 3D map of downtown Toronto")} />
+    {status === "loading" ? <div className="toronto-map-loader"><i /><span>{t("Assembling Toronto")}</span></div> : null}
+    {status === "error" ? <div className="toronto-map-fallback"><span>Toronto</span><small>{t("Interactive map data needs an internet connection.")}</small></div> : null}
   </div>;
 }
 

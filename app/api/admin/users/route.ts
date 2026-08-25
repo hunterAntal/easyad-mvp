@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   if (role === "operator") {
     const institution = institutionId ? await getUserById(institutionId) : null;
     if (!institution || institution.role !== "institutional") {
-      return NextResponse.json({ error: "Operators must be assigned to an institutional account" }, { status: 400 });
+      return NextResponse.json({ error: "Operators must be assigned to an institution account" }, { status: 400 });
     }
     if (await countInstitutionOperators(institution.id) >= institution.operatorLimit) {
       return NextResponse.json({ error: "That institution has reached its operator seat limit" }, { status: 409 });

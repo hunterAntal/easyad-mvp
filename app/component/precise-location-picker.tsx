@@ -4,10 +4,12 @@ import "./precise-location-picker.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import { mapBounds } from "../utils";
+import { useI18n } from "../i18n/client";
 
 type Point = { x: number; y: number };
 
 export default function PreciseLocationPicker({ point, onChange }: { point: Point; onChange: (point: Point) => void }) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -42,7 +44,7 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
       map.on("load", () => {
         const markerElement = document.createElement("div");
         markerElement.className = "precise-location-marker-anchor";
-        markerElement.setAttribute("aria-label", "Device location marker");
+        markerElement.setAttribute("aria-label", t("Device location marker"));
         const markerIcon = document.createElement("i");
         markerIcon.className = "precise-location-marker";
         markerElement.append(markerIcon);
@@ -85,7 +87,7 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
 
   return (
     <div className="precise-location-picker">
-      <div ref={containerRef} className="precise-location-map" role="application" aria-label="Precise device location map" />
+      <div ref={containerRef} className="precise-location-map" role="application" aria-label={t("Precise device location map")} />
       {fallback ? <div className="precise-location-fallback" onContextMenu={setFallbackPoint}><i className="precise-location-marker" style={{ left: `${point.x}%`, top: `${point.y}%` }} /></div> : null}
     </div>
   );

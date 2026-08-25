@@ -5,6 +5,22 @@
   font-size: .72rem;
 }
 
+.commercial-policy {
+  color: var(--muted);
+  background: var(--soft-blue);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--radius-sm);
+  margin: 0 0 18px;
+  padding: 12px 14px;
+}
+
+.commercial-status {
+  color: var(--muted);
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
 @media (min-width:901px) {
 
 .billing-table .table-head,

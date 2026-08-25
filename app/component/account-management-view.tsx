@@ -1,11 +1,15 @@
 "use client";
 
 import "./account-management-view.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { Booking, Creative, InventoryItem, MediaResource, Role } from "../data";
 import type { DbUser } from "../lib/db";
+import { managedRoleOptions, roleLabel } from "../roles";
 import { money } from "../utils";
 import { PanelHeading } from "./shared-ui";
+import SecretInput from "./secret-input";
+import { useI18n } from "../i18n/client";
 
 type ManagedRole = Exclude<Role, "admin">;
 
@@ -37,12 +41,14 @@ export default function AccountManagementView({
   onUpdateAccount: (id: string, updates: { role: ManagedRole; status: DbUser["status"]; institutionId: string | null; operatorLimit: number }) => Promise<boolean>;
   onDeleteAccount: (id: string) => Promise<boolean>;
 }) {
+  const { formatDate, locale, t } = useI18n();
   const [selectedId, setSelectedId] = useState(users[0]?.id ?? "");
   const [role, setRole] = useState<ManagedRole>("advertiser");
   const [status, setStatus] = useState<DbUser["status"]>("active");
   const [institutionId, setInstitutionId] = useState<string | null>(null);
   const [operatorLimit, setOperatorLimit] = useState(5);
   const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [roleFilter, setRoleFilter] = useState<ManagedRole | "all">("all");
   const [statusFilter, setStatusFilter] = useState<DbUser["status"] | "all">("all");
   const [saving, setSaving] = useState(false);
@@ -116,69 +122,77 @@ export default function AccountManagementView({
       <div className="panel account-list-panel">
         <PanelHeading eyebrow="Super admin controls" title="Accounts" />
         <div className="account-filters">
-          <label>Search accounts<input aria-label="Search accounts" value={searchQuery} placeholder="Name, email, or account ID" onChange={(event) => setSearchQuery(event.target.value)} /></label>
-          <label>Role<select className="select" aria-label="Filter by role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as ManagedRole | "all")}><option value="all">All roles</option><option value="advertiser">Advertiser</option><option value="institutional">Institutional</option><option value="operator">Operator</option></select></label>
-          <label>Access<select className="select" aria-label="Filter by access status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DbUser["status"] | "all")}><option value="all">All access</option><option value="active">Active</option><option value="banned">Banned</option></select></label>
-          <small>{filteredUsers.length} of {users.length} accounts</small>
+          <div className="account-search-field">
+            <label htmlFor="account-search">{t("Search accounts")}</label>
+            <div className="account-search-control">
+              <input aria-label={t("Search accounts")} id="account-search" ref={searchRef} value={searchQuery} placeholder={t("Name, email, or account ID")} onChange={(event) => setSearchQuery(event.target.value)} />
+              {searchQuery ? <button aria-label={t("Clear account search")} onClick={() => { setSearchQuery(""); searchRef.current?.focus(); }} type="button"><X aria-hidden="true" /></button> : null}
+            </div>
+          </div>
+          <label>{t("Role")}<select className="select" aria-label={t("Filter by role")} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as ManagedRole | "all")}><option value="all">{t("All roles")}</option>{managedRoleOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
+          <label>{t("Access")}<select className="select" aria-label={t("Filter by access status")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DbUser["status"] | "all")}><option value="all">{t("All access")}</option><option value="active">{t("Active")}</option><option value="banned">{t("Banned")}</option></select></label>
+          <small>{t("{visible} of {total} accounts", { visible: filteredUsers.length, total: users.length })}</small>
         </div>
         <div className="account-list" role="list">
           {filteredUsers.length ? filteredUsers.map((user) => (
             <button className={`account-list-item ${user.id === selectedUser?.id ? "selected" : ""}`} type="button" key={user.id} onClick={() => { setSelectedId(user.id); setMessage(""); }}>
               <span><strong>{user.name}</strong><small>{user.email}</small></span>
-              <span className={`status ${user.status === "banned" ? "bad" : "good"}`}>{user.status}</span>
-              <small>{user.role === "operator" && user.institutionId ? "operator - institution" : user.role}</small>
+              <span className={`status ${user.status === "banned" ? "bad" : "good"}`}>{t(user.status)}</span>
+              <small>{t(user.role === "operator" && user.institutionId ? "Operator - institution" : roleLabel(user.role))}</small>
             </button>
-          )) : <div className="empty-state"><strong>No matching accounts</strong><span>Adjust the account filters or create a new non-admin account.</span></div>}
+          )) : <div className="empty-state"><strong>{t("No matching accounts")}</strong><span>{t("Adjust the account filters or create a new non-admin account.")}</span></div>}
         </div>
-        <form className="account-create-form" onSubmit={createAccount}>
-          <span className="eyebrow">Create account</span>
-          <label>Name<input required value={newAccount.name} onChange={(event) => setNewAccount((current) => ({ ...current, name: event.target.value }))} /></label>
-          <label>Email<input required type="email" value={newAccount.email} onChange={(event) => setNewAccount((current) => ({ ...current, email: event.target.value }))} /></label>
-          <label>Temporary password<input required minLength={10} type="password" value={newAccount.password} onChange={(event) => setNewAccount((current) => ({ ...current, password: event.target.value }))} /></label>
-          <label>Role<select className="select" value={newAccount.role} onChange={(event) => setNewAccount((current) => ({ ...current, role: event.target.value as ManagedRole }))}><option value="advertiser">Advertiser</option><option value="institutional">Institutional user</option><option value="operator">Operator</option></select></label>
-          {newAccount.role === "institutional" ? <label>Operator seats<input type="number" min="1" max="100" value={newAccount.operatorLimit} onChange={(event) => setNewAccount((current) => ({ ...current, operatorLimit: Number(event.target.value) }))} /></label> : null}
-          {newAccount.role === "operator" ? <label>Institution<select className="select" required value={newAccount.institutionId ?? ""} onChange={(event) => setNewAccount((current) => ({ ...current, institutionId: event.target.value || null }))}><option value="">Choose institution</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
-          <button className="primary-button" type="submit" disabled={saving}>{saving ? "Creating..." : "Create account"}</button>
+        <form className="account-create-form" noValidate onSubmit={createAccount}>
+          <span className="eyebrow">{t("Create account")}</span>
+          <label>{t("Name")}<input required value={newAccount.name} onChange={(event) => setNewAccount((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label>{t("Email")}<input required type="email" value={newAccount.email} onChange={(event) => setNewAccount((current) => ({ ...current, email: event.target.value }))} /></label>
+          <SecretInput autoComplete="new-password" label="Temporary password" minLength={10} required secretName="temporary password" value={newAccount.password} onChange={(event) => setNewAccount((current) => ({ ...current, password: event.target.value }))} />
+          <label>{t("Account role")}<select aria-label={t("New account role")} className="select" value={newAccount.role} onChange={(event) => setNewAccount((current) => ({ ...current, role: event.target.value as ManagedRole }))}>{managedRoleOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
+          {newAccount.role === "institutional" ? <p className="account-role-help">{t("Institution accounts open the dedicated Civic Screen Operations dashboard at /government. Super Admin retains access to every institution network.")}</p> : null}
+          {newAccount.role === "institutional" ? <label>{t("Operator seats")}<input type="number" min="1" max="100" value={newAccount.operatorLimit} onChange={(event) => setNewAccount((current) => ({ ...current, operatorLimit: Number(event.target.value) }))} /></label> : null}
+          {newAccount.role === "operator" ? <label>{t("Institution")}<select className="select" required value={newAccount.institutionId ?? ""} onChange={(event) => setNewAccount((current) => ({ ...current, institutionId: event.target.value || null }))}><option value="">{t("Choose institution")}</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
+          <button className="primary-button" type="submit" disabled={saving}>{t(saving ? "Creating..." : "Create account")}</button>
         </form>
       </div>
 
       <div className="panel account-detail-panel">
         {selectedUser ? <>
-          <PanelHeading eyebrow="Selected account" title={selectedUser.name} action={<span className={`status ${selectedUser.status === "banned" ? "bad" : "good"}`}>{selectedUser.status}</span>} />
-          <div className="account-identity"><span>{selectedUser.email}</span><small>Created {new Date(selectedUser.createdAt).toLocaleDateString()}</small></div>
+          <PanelHeading eyebrow="Selected account" title={selectedUser.name} action={<span className={`status ${selectedUser.status === "banned" ? "bad" : "good"}`}>{t(selectedUser.status)}</span>} />
+          <div className="account-identity"><span>{selectedUser.email}</span><small>{t("Created {date}", { date: formatDate(selectedUser.createdAt) })}</small></div>
           <div className="account-controls">
-            <label>Workspace role<select className="select" value={role} disabled={saving} onChange={(event) => setRole(event.target.value as ManagedRole)}><option value="advertiser">Advertiser</option><option value="institutional">Institutional user</option><option value="operator">Operator</option></select></label>
-            <label>Account access<select className="select" value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as DbUser["status"])}><option value="active">Active</option><option value="banned">Banned</option></select></label>
-            {role === "institutional" ? <label>Operator seats<input type="number" min="1" max="100" disabled={saving} value={operatorLimit} onChange={(event) => setOperatorLimit(Number(event.target.value))} /></label> : null}
-            {role === "operator" ? <label>Institution<select className="select" required disabled={saving} value={institutionId ?? ""} onChange={(event) => setInstitutionId(event.target.value || null)}><option value="">Choose institution</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
-            <button className="primary-button" type="button" disabled={saving} onClick={() => void saveAccount()}>{saving ? "Saving..." : "Save account"}</button>
-            <button className="danger-button" type="button" disabled={saving} onClick={() => void deleteAccount()}>Delete account</button>
+            <label>{t("Workspace role")}<select className="select" value={role} disabled={saving} onChange={(event) => setRole(event.target.value as ManagedRole)}>{managedRoleOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
+            <label>{t("Account access")}<select className="select" value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as DbUser["status"])}><option value="active">{t("Active")}</option><option value="banned">{t("Banned")}</option></select></label>
+            {role === "institutional" ? <label>{t("Operator seats")}<input type="number" min="1" max="100" disabled={saving} value={operatorLimit} onChange={(event) => setOperatorLimit(Number(event.target.value))} /></label> : null}
+            {role === "operator" ? <label>{t("Institution")}<select className="select" required disabled={saving} value={institutionId ?? ""} onChange={(event) => setInstitutionId(event.target.value || null)}><option value="">{t("Choose institution")}</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
+            <button className="primary-button" type="button" disabled={saving} onClick={() => void saveAccount()}>{t(saving ? "Saving..." : "Save account")}</button>
+            <button className="danger-button" type="button" disabled={saving} onClick={() => void deleteAccount()}>{t("Delete account")}</button>
           </div>
-          {message ? <p className="account-message">{message}</p> : null}
+          {message ? <p className="account-message">{t(message)}</p> : null}
 
           <section className="account-history-section">
-            <div className="account-history-heading"><span className="eyebrow">Campaign history</span><strong>{campaigns.length} campaign{campaigns.length === 1 ? "" : "s"}</strong></div>
+            <div className="account-history-heading"><span className="eyebrow">{t("Campaign history")}</span><strong>{t(campaigns.length === 1 ? "{count} campaign" : "{count} campaigns", { count: campaigns.length })}</strong></div>
             <div className="account-campaign-list">
               {campaigns.length ? campaigns.map((campaign) => {
                 const unit = inventory.find((item) => item.id === campaign.inventoryId);
-                return <div className="account-campaign-row" key={campaign.id}><span><strong>{campaign.campaign}</strong><small>{unit?.name ?? campaign.inventoryId} - {campaign.start} to {campaign.end}</small></span><span className="status">{campaign.status}</span><span>{money(campaign.spend)}</span></div>;
-              }) : <div className="empty-state"><strong>No campaign history</strong><span>This account has not reserved inventory yet.</span></div>}
+                return <div className="account-campaign-row" key={campaign.id}><span><strong>{campaign.campaign}</strong><small>{unit?.name ?? campaign.inventoryId} - {campaign.start} {t("to")} {campaign.end}</small></span><span className="status">{t(campaign.status)}</span><span>{money(campaign.spend, locale)}</span></div>;
+              }) : <div className="empty-state"><strong>{t("No campaign history")}</strong><span>{t("This account has not reserved inventory yet.")}</span></div>}
             </div>
           </section>
 
           <section className="account-history-section">
-            <div className="account-history-heading"><span className="eyebrow">Uploaded files</span><strong>{deviceUploads.length + creativeUploads.length} file{deviceUploads.length + creativeUploads.length === 1 ? "" : "s"}</strong></div>
+            <div className="account-history-heading"><span className="eyebrow">{t("Uploaded files")}</span><strong>{t(deviceUploads.length + creativeUploads.length === 1 ? "{count} file" : "{count} files", { count: deviceUploads.length + creativeUploads.length })}</strong></div>
             <div className="account-upload-list">
-              {[...deviceUploads, ...creativeUploads].map((resource) => (
-                <a className="account-upload-row" key={resource.id} href={resource.publicUrl ?? "#"} target="_blank" rel="noreferrer">
-                  {"mediaType" in resource && resource.mediaType === "video" || "mimeType" in resource && resource.mimeType?.startsWith("video/") ? <video muted playsInline preload="metadata" src={resource.publicUrl ?? undefined} /> : <img src={resource.publicUrl ?? ""} alt={resource.originalName ?? "Uploaded creative"} />}
-                  <span><strong>{"title" in resource ? resource.title : resource.originalName ?? "Uploaded creative"}</strong><small>{"mediaType" in resource ? resource.mediaType : resource.fileType.toUpperCase()}</small></span>
-                </a>
-              ))}
-              {!deviceUploads.length && !creativeUploads.length ? <div className="empty-state"><strong>No uploaded files</strong><span>Device media and campaign creative submitted by this account appear here.</span></div> : null}
+              {[...deviceUploads, ...creativeUploads].map((resource) => {
+                const content = <>
+                  {"mediaType" in resource && resource.mediaType === "video" || "mimeType" in resource && resource.mimeType?.startsWith("video/") ? <video muted playsInline preload="metadata" src={resource.publicUrl ?? undefined} /> : <img src={resource.publicUrl ?? ""} alt={resource.originalName ?? t("Uploaded creative")} />}
+                  <span><strong>{"title" in resource ? resource.title : resource.originalName ?? t("Uploaded creative")}</strong><small>{t("mediaType" in resource ? resource.mediaType : resource.fileType.toUpperCase())}</small></span>
+                </>;
+                return resource.publicUrl ? <a className="account-upload-row" key={resource.id} href={resource.publicUrl} target="_blank" rel="noreferrer">{content}</a> : <div aria-disabled="true" className="account-upload-row unavailable" key={resource.id}>{content}</div>;
+              })}
+              {!deviceUploads.length && !creativeUploads.length ? <div className="empty-state"><strong>{t("No uploaded files")}</strong><span>{t("Device media and campaign creative submitted by this account appear here.")}</span></div> : null}
             </div>
           </section>
-        </> : <div className="empty-state"><strong>Select an account</strong><span>Choose an account from the list to manage its access and history.</span></div>}
+        </> : <div className="empty-state"><strong>{t("Select an account")}</strong><span>{t("Choose an account from the list to manage its access and history.")}</span></div>}
       </div>
     </section>
   );

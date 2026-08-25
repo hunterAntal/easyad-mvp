@@ -56,3 +56,13 @@ test("campaign spaces offers separate creative and inventory actions", async () 
   await user.click(creative);
   expect(onOpenCreative).toHaveBeenCalledWith(booking);
 });
+
+test("static campaign spaces omit playback metrics and the public inventory link", () => {
+  const staticInventory = [{ ...inventory[0], format: "static" as const, deliveryMode: "static" as const }];
+  render(<CampaignSpacesView bookings={[booking]} inventory={staticInventory} onOpenCreative={vi.fn()} />);
+
+  expect(screen.getByText("Static placement")).toBeInTheDocument();
+  expect(screen.getByText("No playback loop")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Inventory" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/s of 120s/)).not.toBeInTheDocument();
+});

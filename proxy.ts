@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { detectLocaleFromGeo, isLocale, LOCALE_COOKIE_NAME, LOCALE_REQUEST_HEADER } from "./app/i18n/config";
 
 const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -56,7 +57,11 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next();
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  const locale = isLocale(cookieLocale) ? cookieLocale : detectLocaleFromGeo(request.headers);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(LOCALE_REQUEST_HEADER, locale);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

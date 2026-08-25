@@ -7,12 +7,10 @@ import type { Booking, InventoryItem, MediaResource } from "../app/data";
 
 const postgresUrl = process.env.TEST_DATABASE_URL;
 
-test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, inventory, bookings, and media", async () => {
-  const originalCwd = process.cwd();
+test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, inventory, bookings, media, and device alerts", async () => {
   const originalDatabaseUrl = process.env.DATABASE_URL;
   const testRoot = mkdtempSync(path.join(tmpdir(), "ooh-market-db-"));
   let db: typeof import("../app/lib/db") | null = null;
-  process.chdir(testRoot);
   process.env.DATABASE_URL = postgresUrl;
 
   try {
@@ -55,7 +53,8 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       availableTo: "2026-08-01",
     };
 
-    assert.equal((await db.createInventory(inventory, user.id))?.id, inventory.id);
+    assert.equal((await db.createInventory({ ...inventory, displayLanguage: "fr" }, user.id))?.id, inventory.id);
+    assert.equal((await db.getInventory(inventory.id))?.displayLanguage, "fr");
     assert.equal((await db.listInventory()).length, 1);
     assert.ok((await db.getInventory(inventory.id))?.tags?.includes("digital"));
     const pendingInventory: InventoryItem = { ...inventory, id: "INV-DB-PENDING", approvalStatus: "pending approval" };
@@ -68,6 +67,7 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
     assert.equal((await db.updateInventoryRecord(inventory.id, { imageInterval: 15 }))?.imageInterval, 15);
     assert.equal((await db.getInventory(inventory.id))?.imageInterval, 15);
     assert.equal((await db.updateInventoryRecord(inventory.id, { maxLoopSeconds: 180 }))?.maxLoopSeconds, 180);
+    assert.equal((await db.updateInventoryRecord(inventory.id, { displayLanguage: "en" }))?.displayLanguage, "en");
     assert.deepEqual((await db.updateInventoryRecord(inventory.id, { tags: ["Urban", "near university", "urban"] }))?.tags, ["urban", "near-university"]);
     assert.equal((await db.getInventory(inventory.id))?.maxLoopSeconds, 180);
 
@@ -112,6 +112,7 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       originalName: "screen.png",
       mimeType: "image/png",
       mediaType: "image",
+      approvalStatus: "pending review",
       sizeBytes: 2048,
       publicUrl: "/media/MED-DB-1",
       createdAt: "2026-07-01T00:00:00.000Z",
@@ -121,6 +122,9 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
     assert.equal((await db.createMediaResource(media)).id, media.id);
     assert.equal((await db.listMediaResources(inventory.id))[0]?.publicUrl, "/media/MED-DB-1");
     assert.equal((await db.getMediaResource(media.id))?.storagePath, media.storagePath);
+    assert.equal((await db.getMediaResource(media.id))?.resource.approvalStatus, "pending review");
+    assert.equal(await db.getPublicMediaResource(media.id), null);
+    assert.equal((await db.updateMediaApprovalStatus(media.id, "approved"))?.approvalStatus, "approved");
     assert.equal((await db.getPublicMediaResource(media.id))?.mimeType, "image/png");
     assert.equal((await db.deleteMediaResource(media.id))?.resource.id, media.id);
     assert.equal(await db.getMediaResource(media.id), null);
@@ -163,12 +167,62 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
     assert.equal((await db.listInventoryAdvertiserResources(inventory.id, dateAtOffset(2))).length, 0);
     assert.equal((await db.getPublicMediaResource("CRV-DB-UPLOAD"))?.originalName, "spot.mp4");
 
+    const deviceAlert = await db.createDeviceAlert({
+      institutionId: user.id,
+      alertType: "public-safety",
+      title: "Database test alert",
+      message: "Follow the posted instructions.",
+      area: "Database Way",
+      targetDeviceIds: [inventory.id],
+      issuedBy: user.name,
+      createdBy: user.id,
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    });
+    assert.equal(deviceAlert?.status, "active");
+    assert.deepEqual((await db.getActiveDeviceAlertForDevice(inventory.id))?.targetDeviceIds, [inventory.id]);
+    await db.getDb().query(`
+      INSERT INTO device_alerts
+        (id, institution_id, alert_type, title, message, area, status, target_device_ids, issued_by, created_by, created_at, expires_at, ended_at)
+      SELECT
+        'ALT-HISTORY-' || LPAD(entry::text, 3, '0'), $1, 'public-safety', 'Historical alert', 'Already ended', 'Database Way',
+        'ended', '[]'::jsonb, 'Temporary Admin', $1,
+        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      FROM generate_series(1, 101) AS entry
+    `, [user.id, deviceAlert!.createdAt]);
+    const alertHistory = await db.listDeviceAlerts(user.id);
+    assert.equal(alertHistory.length, 101);
+    assert.ok(alertHistory.some((alert) => alert.id === deviceAlert!.id));
+    assert.equal((await db.endDeviceAlert(deviceAlert!.id))?.status, "ended");
+    assert.equal(await db.getActiveDeviceAlertForDevice(inventory.id), null);
+
+    const concurrentAlert = {
+      institutionId: user.id,
+      alertType: "public-safety" as const,
+      title: "Concurrent database alert",
+      message: "Only one request should publish.",
+      area: "Database Way",
+      targetDeviceIds: [inventory.id],
+      issuedBy: user.name,
+      createdBy: user.id,
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    };
+    const concurrentResults = await Promise.all([
+      db.createDeviceAlertIfNoConflict(concurrentAlert),
+      db.createDeviceAlertIfNoConflict(concurrentAlert),
+    ]);
+    assert.equal(concurrentResults.filter((result) => result.alert).length, 1);
+    assert.equal(concurrentResults.filter((result) => result.conflictingAlert).length, 1);
+    const concurrentWinner = concurrentResults.find((result) => result.alert)?.alert;
+    assert.ok(concurrentWinner);
+    assert.equal((await db.endDeviceAlert(concurrentWinner!.id))?.status, "ended");
+
     await db.deleteInventoryRecord(inventory.id);
     assert.equal(await db.getInventory(inventory.id), null);
     assert.equal((await db.listBookings()).length, 0);
   } finally {
     await db?.closeDb();
-    process.chdir(originalCwd);
     if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = originalDatabaseUrl;
     vi.resetModules();

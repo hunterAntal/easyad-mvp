@@ -92,7 +92,7 @@ describe("CreativeView", () => {
 
     expect(screen.getByRole("heading", { name: "Upload media" })).toBeInTheDocument();
     expect(screen.getByLabelText("Image or video creative")).toBeInTheDocument();
-    expect(screen.getByText("Select a PNG, JPG, or MP4 file")).toBeInTheDocument();
+    expect(screen.getByText("Select a PNG, JPG, GIF, or MP4 file")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit upload for review" })).toBeDisabled();
   });
 });

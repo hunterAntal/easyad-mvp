@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../types";
+import type { Locale } from "../i18n/config";
 
 /**
  * Single integration point for the site assistant.
@@ -21,15 +22,15 @@ import type { ChatMessage } from "../types";
  *   });
  *   return { role: "assistant", content: textFrom(response) };
  */
-export async function generateChatReply(history: ChatMessage[]): Promise<ChatMessage> {
+export async function generateChatReply(history: ChatMessage[], locale: Locale = "en"): Promise<ChatMessage> {
   // `history` is intentionally unused for now; it is the context a future model
   // would condition on. Referenced here so the contract stays stable.
   void history;
-  return { role: "assistant", content: "Hello world" };
+  return { role: "assistant", content: locale === "fr" ? "Bonjour tout le monde" : "Hello world" };
 }
 
 // Optional system prompt scaffold for when a model is connected.
 export const SYSTEM_PROMPT =
-  "You are the OOH Market assistant. Help advertisers, operators, and institutions " +
+  "You are the EasyAD Platform assistant. Help advertisers, operators, and institutions " +
   "discover inventory, book campaigns, submit creative, and understand reporting. " +
   "Be concise and never invent campaign, billing, or account data.";

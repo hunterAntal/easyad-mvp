@@ -8,11 +8,13 @@ const resource = { resource: { id: "MED-PRIVATE", inventoryId: "INV-PRIVATE", ow
 vi.mock("../app/lib/auth", () => ({
   getCurrentUser: async () => ({ id: state.userId, name: "User", email: "user@example.com", role: "operator", status: "active", institutionId: state.userId === "USR-OWNER" ? "INST-1" : "INST-2", operatorLimit: 0, createdAt: "2026-01-01" }),
   canManageInventoryRecord: (user: { institutionId: string }, inventory: { institutionId: string }) => user.institutionId === inventory.institutionId,
+  canPublishInventoryRecord: () => false,
 }));
 vi.mock("../app/lib/db", () => ({
   getMediaResource: async () => resource,
   getInventory: async () => ({ id: "INV-PRIVATE", institutionId: "INST-1" }),
   deleteMediaResource: async () => { state.deleted = true; return resource; },
+  updateMediaApprovalStatus: async () => null,
 }));
 vi.mock("../app/lib/media-storage", () => ({ deleteStoredMedia: async () => undefined }));
 

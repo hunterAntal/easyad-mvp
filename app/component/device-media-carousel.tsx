@@ -4,6 +4,7 @@ import "./device-media-carousel.css";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Fade from "embla-carousel-fade";
+import { useI18n } from "../i18n/client";
 
 export type DeviceMediaSlide = {
   id: string;
@@ -18,8 +19,9 @@ const defaultImageInterval = 6;
 const minImageInterval = 2;
 const maxImageInterval = 60;
 
-export default function DeviceMediaCarousel({ inventoryName, imageInterval, slides }: { inventoryName: string; imageInterval: number; slides: DeviceMediaSlide[] }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: slides.length > 1, align: "start" }, [Fade()]);
+export default function DeviceMediaCarousel({ inventoryName, imageInterval, slides, interactive = true }: { inventoryName: string; imageInterval: number; slides: DeviceMediaSlide[]; interactive?: boolean }) {
+  const { t } = useI18n();
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: slides.length > 1, align: "start", watchDrag: interactive }, [Fade()]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const effectiveImageInterval = clampInterval(imageInterval);
 
@@ -52,14 +54,14 @@ export default function DeviceMediaCarousel({ inventoryName, imageInterval, slid
 
   if (!slides.length) {
     return (
-      <div className="media-stage empty" aria-label={`${inventoryName} advertising media`}>
-        <p>No images or videos have been uploaded for this device yet.</p>
+      <div className="media-stage empty" aria-label={t("{name} advertising media", { name: inventoryName })}>
+        <p>{t("No images or videos have been uploaded for this device yet.")}</p>
       </div>
     );
   }
 
   return (
-    <div className="media-stage" aria-label={`${inventoryName} advertising media`}>
+    <div className="media-stage" aria-label={t("{name} advertising media", { name: inventoryName })}>
       <div className="device-carousel" ref={emblaRef}>
         <div className="device-carousel-track">
           {slides.map((slide) => (
@@ -74,12 +76,12 @@ export default function DeviceMediaCarousel({ inventoryName, imageInterval, slid
         </div>
       </div>
 
-      <button type="button" className="device-nav prev" onClick={scrollPrev} aria-label="Previous media">
+      {interactive && slides.length > 1 ? <><button type="button" className="device-nav prev" onClick={scrollPrev} aria-label={t("Previous media")}>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7" /></svg>
       </button>
-      <button type="button" className="device-nav next" onClick={scrollNext} aria-label="Next media">
+      <button type="button" className="device-nav next" onClick={scrollNext} aria-label={t("Next media")}>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" /></svg>
-      </button>
+      </button></> : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "name": "ooh-market-mvp",
+  "name": "easyad-platform",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,6 +8,7 @@
     "start": "next start",
     "init": "npm install && node scripts/init-project.cjs",
     "db:migrate": "node scripts/migrate.cjs",
+    "seed:demo-data": "node scripts/seed-demo-data.cjs",
     "seed:temp-accounts": "node scripts/seed-temp-accounts.cjs",
     "seed:test-inventory": "node scripts/seed-test-inventory.cjs",
     "seed:test-data": "npm run seed:temp-accounts && npm run seed:test-inventory",
@@ -30,6 +31,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@next/env": "16.2.9",
     "@playwright/test": "^1.61.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

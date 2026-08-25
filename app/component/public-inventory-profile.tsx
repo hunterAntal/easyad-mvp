@@ -2,24 +2,34 @@ import "./public-inventory-profile.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InventoryAdvertiserResource, MediaResource, formats } from "../data";
-import { getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../lib/db";
-import { money, number } from "../utils";
+import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../lib/db";
+import { isDigitalInventory } from "../lib/inventory-delivery";
+import { money } from "../utils";
 import DeviceScreen from "./device-screen";
+import DeviceApiGuide from "./device-api-guide";
 import type { DeviceMediaSlide } from "./device-media-carousel";
 import { deviceTemplates, resolveDeviceTemplate } from "./device-templates";
+import { getServerI18n } from "../i18n/server";
+import { translate } from "../i18n/messages";
+import type { Locale } from "../i18n/config";
 
 export async function PublicInventoryProfile({ inventoryId, alias = "inventory" }: { inventoryId: string; alias?: "inventory" | "device" }) {
+  const { formatDate, formatNumber, locale, t } = await getServerI18n();
   const inventory = await getPublishedInventory(inventoryId);
-  if (!inventory) notFound();
+  if (!inventory || !isDigitalInventory(inventory)) notFound();
 
-  const deviceResources = await listMediaResources(inventoryId);
-  const advertiserResources = await listInventoryAdvertiserResources(inventoryId);
-  const totalResources = deviceResources.length + advertiserResources.length;
+  const [deviceResources, advertiserResources, activeAlert] = await Promise.all([
+    listMediaResources(inventoryId),
+    listInventoryAdvertiserResources(inventoryId),
+    getActiveDeviceAlertForDevice(inventoryId),
+  ]);
+  const approvedDeviceResources = deviceResources.filter((resource) => resource.approvalStatus === "approved");
+  const totalResources = approvedDeviceResources.length + advertiserResources.length;
   const spec = formats[inventory.format];
   const template = resolveDeviceTemplate(undefined, inventory.displayTemplate);
   const templateLabel = deviceTemplates.find((entry) => entry.id === template)?.label ?? "Full screen";
   const city = deriveCity(inventory.address);
-  const deviceSlides: DeviceMediaSlide[] = deviceResources
+  const deviceSlides: DeviceMediaSlide[] = approvedDeviceResources
     .filter((resource) => resource.mediaType === "image" || resource.mediaType === "video")
     .map((resource) => ({
       id: resource.id,
@@ -45,50 +55,51 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
     <main className="public-device-page">
       <header className="public-device-hero">
         <div>
-          <span className="eyebrow">{alias === "device" ? "Device media URL" : "Inventory media URL"}</span>
+          <span className="eyebrow">{t(alias === "device" ? "Device media URL" : "Inventory media URL")}</span>
           <h1>{inventory.name}</h1>
           <p>{inventory.address}</p>
         </div>
         <div className="public-device-actions">
-          <Link href="/">Portal</Link>
-          <Link href={`/devices/${inventory.id}`}>Device URL</Link>
-          <Link href={`/inventory/${inventory.id}`}>Inventory URL</Link>
-          <a href={`/api/public/devices/${inventory.id}/media`}>Device API</a>
+          <Link href="/">{t("Portal")}</Link>
+          <Link href={`/devices/${inventory.id}`}>{t("Device URL")}</Link>
+          <Link href={`/inventory/${inventory.id}`}>{t("Inventory URL")}</Link>
+          <a href={`/api/public/devices/${inventory.id}/media`}>{t("Device API")}</a>
         </div>
       </header>
 
       <section className="public-device-summary">
-        <PublicMetric label="Format" value={spec.label} />
-        <PublicMetric label="Daily rate" value={money(inventory.price)} />
-        <PublicMetric label="Impressions" value={number(inventory.impressions)} />
-        <PublicMetric label="Audience" value={inventory.audience} />
+        <PublicMetric locale={locale} label="Format" value={t(spec.label)} />
+        <PublicMetric locale={locale} label="Daily rate" value={money(inventory.price, locale)} />
+        <PublicMetric locale={locale} label="Impressions" value={formatNumber(inventory.impressions)} />
+        <PublicMetric locale={locale} label="Audience" value={t(inventory.audience)} />
       </section>
-      {inventory.tags?.length ? <section className="public-device-section public-device-tags"><div className="public-section-heading"><span className="eyebrow">Device tags</span></div><div className="device-tag-list">{inventory.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></section> : null}
+      <DeviceApiGuide deviceId={inventory.id} deviceName={inventory.name} mediaCount={previewSlides.length} />
+      {inventory.tags?.length ? <section className="public-device-section public-device-tags"><div className="public-section-heading"><span className="eyebrow">{t("Device tags")}</span></div><div className="device-tag-list">{inventory.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div></section> : null}
 
       <section className="public-device-section">
         <div className="public-section-heading">
-          <div><span className="eyebrow">Live device display</span><h2>{templateLabel} template preview</h2></div>
-          <Link href={`/devices/${inventory.id}`}>Open full device view</Link>
+          <div><span className="eyebrow">{t("Live device display")}</span><h2>{t("{template} template preview", { template: t(templateLabel) })}</h2></div>
+          <Link href={`/devices/${inventory.id}`}>{t("Open full device view")}</Link>
         </div>
         <div className="public-device-preview">
-          <DeviceScreen inventoryName={inventory.name} city={city} imageInterval={inventory.imageInterval} slides={previewSlides} template={template} preview />
+          <DeviceScreen inventoryName={inventory.name} city={city} imageInterval={inventory.imageInterval} slides={previewSlides} template={template} displayLanguage={inventory.displayLanguage ?? "en"} activeAlert={activeAlert} preview />
         </div>
       </section>
 
       <section className="public-device-section">
         <div className="public-section-heading">
-          <span className="eyebrow">Public media resources</span>
-          <h2>{totalResources} media file{totalResources === 1 ? "" : "s"}</h2>
+          <span className="eyebrow">{t("Public media resources")}</span>
+          <h2>{t(totalResources === 1 ? "{count} media file" : "{count} media files", { count: totalResources })}</h2>
         </div>
         {totalResources ? (
           <div className="public-media-grid">
-            {deviceResources.map((resource) => <DeviceResourceCard key={resource.id} resource={resource} />)}
-            {advertiserResources.map((resource) => <AdvertiserResourceCard key={resource.id} resource={resource} />)}
+            {approvedDeviceResources.map((resource) => <DeviceResourceCard key={resource.id} resource={resource} locale={locale} formatDate={formatDate} />)}
+            {advertiserResources.map((resource) => <AdvertiserResourceCard key={resource.id} resource={resource} locale={locale} />)}
           </div>
         ) : (
           <div className="public-empty">
-            <strong>No media uploaded yet.</strong>
-            <span>Operator device resources and advertiser-uploaded creative files for this inventory will appear here.</span>
+            <strong>{t("No media uploaded yet.")}</strong>
+            <span>{t("Operator device resources and advertiser-uploaded creative files for this inventory will appear here.")}</span>
           </div>
         )}
       </section>
@@ -101,7 +112,8 @@ function deriveCity(address: string) {
   return parts.length > 1 ? parts.slice(-1)[0] : "Thunder Bay, ON";
 }
 
-function DeviceResourceCard({ resource }: { resource: MediaResource }) {
+function DeviceResourceCard({ resource, locale, formatDate }: { resource: MediaResource; locale: Locale; formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string }) {
+  const t = (message: string, variables?: Record<string, string | number>) => translate(locale, message, variables);
   return (
     <article className="public-media-card">
       <div className="public-media-preview">
@@ -112,17 +124,18 @@ function DeviceResourceCard({ resource }: { resource: MediaResource }) {
         )}
       </div>
       <div className="public-media-body">
-        <span className="eyebrow">Device resource</span>
+        <span className="eyebrow">{t("Device resource")}</span>
         <h3>{resource.title}</h3>
         <p>{resource.originalName}</p>
-        <small>{resource.mediaType} - uploaded {new Date(resource.createdAt).toLocaleString()}</small>
-        <a href={resource.publicUrl} target="_blank" rel="noreferrer">Open media file</a>
+        <small>{t(resource.mediaType)} - {t("uploaded {date}", { date: formatDate(resource.createdAt, { dateStyle: "medium", timeStyle: "short" }) })}</small>
+        <a href={resource.publicUrl} target="_blank" rel="noreferrer">{t("Open media file")}</a>
       </div>
     </article>
   );
 }
 
-function AdvertiserResourceCard({ resource }: { resource: InventoryAdvertiserResource }) {
+function AdvertiserResourceCard({ resource, locale }: { resource: InventoryAdvertiserResource; locale: Locale }) {
+  const t = (message: string, variables?: Record<string, string | number>) => translate(locale, message, variables);
   return (
     <article className="public-media-card">
       <div className="public-media-preview">
@@ -133,16 +146,16 @@ function AdvertiserResourceCard({ resource }: { resource: InventoryAdvertiserRes
         )}
       </div>
       <div className="public-media-body">
-        <span className="eyebrow">Advertiser creative - {resource.advertiser}</span>
+        <span className="eyebrow">{t("Advertiser creative - {name}", { name: resource.advertiser })}</span>
         <h3>{resource.campaign}</h3>
-        <p>{resource.originalName ?? "Uploaded creative"} - {resource.width}x{resource.height} - {resource.fileType.toUpperCase()}</p>
-        <small>{resource.start} to {resource.end} - {resource.bookingStatus}</small>
-        {resource.publicUrl ? <a href={resource.publicUrl} target="_blank" rel="noreferrer">Open media file</a> : null}
+        <p>{resource.originalName ?? t("Uploaded creative")} - {resource.width}x{resource.height} - {resource.fileType.toUpperCase()}</p>
+        <small>{resource.start} {t("to")} {resource.end} - {t(resource.bookingStatus)}</small>
+        {resource.publicUrl ? <a href={resource.publicUrl} target="_blank" rel="noreferrer">{t("Open media file")}</a> : null}
       </div>
     </article>
   );
 }
 
-function PublicMetric({ label, value }: { label: string; value: string | number }) {
-  return <div className="public-metric"><span>{label}</span><strong>{value}</strong></div>;
+function PublicMetric({ label, value, locale }: { label: string; value: string | number; locale: Locale }) {
+  return <div className="public-metric"><span>{translate(locale, label)}</span><strong>{value}</strong></div>;
 }

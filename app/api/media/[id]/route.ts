@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canManageInventoryRecord, getCurrentUser } from "../../../lib/auth";
-import { deleteMediaResource, getInventory, getMediaResource } from "../../../lib/db";
+import { canPublishInventoryRecord, canManageInventoryRecord, getCurrentUser } from "../../../lib/auth";
+import { deleteMediaResource, getInventory, getMediaResource, updateMediaApprovalStatus } from "../../../lib/db";
 import { deleteStoredMedia } from "../../../lib/media-storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await context.params;
+  const existing = await getMediaResource(id);
+  if (!existing) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+  const inventory = await getInventory(existing.resource.inventoryId);
+  if (!inventory || !canPublishInventoryRecord(user, inventory)) {
+    return NextResponse.json({ error: "Only the owning institution or a super admin can review this content" }, { status: 403 });
+  }
+  const body = await request.json().catch(() => ({}));
+  if (body.approvalStatus !== "approved" && body.approvalStatus !== "rejected") {
+    return NextResponse.json({ error: "Choose approve or reject" }, { status: 400 });
+  }
+  const resource = await updateMediaApprovalStatus(id, body.approvalStatus);
+  if (!resource) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+  return NextResponse.json({ resource });
+}
 
 export async function DELETE(_request: NextRequest, context: RouteContext) {
   const user = await getCurrentUser();

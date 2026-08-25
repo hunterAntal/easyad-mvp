@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { DisplayTemplate, FormatKey, InventoryItem, displayTemplates, formats } from "../../data";
+import { isLocale, type Locale } from "../../i18n/config";
 import { canManageInventory, getCurrentUser, getInstitutionScope } from "../../lib/auth";
 import { createInventory, listInventory, listInventoryByInstitution, listPublishedInventory } from "../../lib/db";
+import { isValidAvailabilityWindow } from "../../lib/inventory-availability";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -22,6 +24,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Operators must belong to an institution before creating devices" }, { status: 403 });
   }
   const format = isFormat(body.format) ? body.format : "digital";
+  const availabilityWindow = {
+    availableFrom: cleanString(body.availableFrom, "2026-07-01"),
+    availableTo: cleanString(body.availableTo, "2026-09-01"),
+  };
+  if (!isValidAvailabilityWindow(availabilityWindow)) {
+    return NextResponse.json({ error: "Choose a valid availability start and end date" }, { status: 400 });
+  }
   const item: InventoryItem = {
     id: `INV-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`,
     name: cleanString(body.name, "New Inventory Unit"),
@@ -39,12 +48,20 @@ export async function POST(request: NextRequest) {
     occupancy: cleanNumber(body.occupancy, 0),
     imageInterval: cleanImageInterval(body.imageInterval),
     maxLoopSeconds: cleanLoopCapacity(body.maxLoopSeconds),
-    availableFrom: cleanString(body.availableFrom, "2026-07-01"),
-    availableTo: cleanString(body.availableTo, "2026-09-01"),
-    approvalStatus: user.role === "operator" || user.role === "institutional" ? "pending approval" : "approved",
+    ...availabilityWindow,
+    approvalStatus: user.role === "operator" ? "pending approval" : "approved",
     tags: cleanTags(body.tags),
     displayTemplate: cleanTemplate(body.displayTemplate),
+    displayLanguage: cleanDisplayLanguage(body.displayLanguage),
     commentsEnabled: body.commentsEnabled !== false,
+    deliveryMode: body.deliveryMode === "static" || body.deliveryMode === "digital" ? body.deliveryMode : format === "static" ? "static" : format === "digital" ? "digital" : "unknown",
+    productType: cleanString(body.productType, format),
+    productionLeadDays: cleanWholeNumber(body.productionLeadDays, format === "static" ? 10 : 0),
+    installationLeadDays: cleanWholeNumber(body.installationLeadDays, format === "static" ? 5 : 0),
+    latitude: optionalNumber(body.latitude),
+    longitude: optionalNumber(body.longitude),
+    measurementSource: typeof body.measurementSource === "string" ? body.measurementSource.trim() || null : null,
+    measurementUpdatedAt: typeof body.measurementUpdatedAt === "string" ? body.measurementUpdatedAt : null,
   };
 
   const created = await createInventory(item, user.id, institutionId);
@@ -59,6 +76,10 @@ function cleanTemplate(value: unknown): DisplayTemplate {
   return typeof value === "string" && (displayTemplates as string[]).includes(value) ? (value as DisplayTemplate) : "fullscreen";
 }
 
+function cleanDisplayLanguage(value: unknown): Locale {
+  return isLocale(value) ? value : "en";
+}
+
 function cleanString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -67,6 +88,9 @@ function cleanNumber(value: unknown, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+
+function cleanWholeNumber(value: unknown, fallback: number) { return Math.max(0, Math.round(cleanNumber(value, fallback))); }
+function optionalNumber(value: unknown) { const parsed = Number(value); return value === "" || value == null || !Number.isFinite(parsed) ? null : parsed; }
 
 function cleanImageInterval(value: unknown) {
   const parsed = Number(value);
