@@ -20,6 +20,7 @@
 | Deletion / retention | `ON DELETE` constraints in `database/schema.sql`; existing delete routes | Schema + API implementation | 2026-08-21 |
 | Billing / payment | `app/lib/payments.ts`, `app/api/bookings/[id]/payment/route.ts` | Domain/API implementation | 2026-08-21 |
 | Legal / regulatory copy | No maintained legal source. Official public-alert integration is out of scope; the UI must say the override affects owned screens only. | Explicit scope boundary | 2026-08-21 |
+| Authenticated player control, pairing, acknowledgments, and revocation | `docs/adr/0004-authenticated-browser-player.md`, `app/lib/players.ts`, player API routes | User-authorized P0/P1 plan + implemented protocol | 2026-09-05 |
 | Market / content conventions | `README.md`, Thunder Bay seed inventory | Product implementation evidence | 2026-08-21 |
 
 ## Visual contract
@@ -48,6 +49,9 @@
 | Scrollbar | Global application stylesheet | `DESIGN.md` + `app/globals.css` | stable-gutter geometry exception | computed style + browser |
 | Toast | Shared `toast` service and `Toaster` | This contract + `app/component/toast.tsx` | success / info / error | live-region test |
 | CRUD | Server-authorized API routes with OohApp state reconciliation | Route contracts + this contract | stay in owning workspace | full-flow tests |
+| Player Connection | Shared `PlayerControl`, `SecretInput`, `AppDialog`, `PanelHeading`, and `toast`; existing `shared-ui.css` tokens | ADR 0004 | screen-owner status / code creation / confirmed disconnect | player component + API/database + Chrome tests |
+| Player Runtime | `PlayerRuntime`, `player-storage.ts`, `PlayerRotation`, and existing `DeviceScreen`; shared form/button styling | ADR 0004 and ADR 0005 | pairing / active content / offline restoration / expired or storage-failure fallback | browser pairing, cache/outbox restart, quota rollback, offline alert/lease expiry, French and keyboard checks |
+| Digital Allocation and Evidence | `DigitalAllocation` and `DeliveryEvidenceSummary` within the existing campaign workspace | ADR 0005 and canonical report API | immutable quote allocation / provenance-separated report | confirmation concurrency and browser campaign report |
 
 ## Component behavior
 
@@ -89,6 +93,17 @@
 | Learn about Civic Screen Operations | Compact `View workspace details` link at the bottom of `/` | normal route transition | `/government/about` public overview | dedicated institutional capabilities and scope are visible before authentication | marketplace return link remains available | overview heading | current task decision |
 | Continue from government overview | `Continue to secure sign in` or `Open your dashboard` | normal route transition | `/government/login` when signed out; `/government` when already authorized | audience and access boundary stay explicit | return to overview or marketplace | sign-in or command-centre heading | current task decision + auth state |
 | Sign in as Institution account | `Enter government workspace` at `/government/login` | stable submit action | `/government` Civic Screen Operations command centre | authenticated civic shell identity | generic credential error + retry; non-government roles receive an access boundary | command-centre heading | auth login route + current task decision |
+| Create pairing code | `Create pairing code` in selected digital screen's Player connection panel | disabled fixed-width action | stay in selected screen | masked one-time code plus expiry text | inline error; request a new code if an uncertain response lost the first | show/hide code control | ADR 0004 |
+| Pair screen | `Pair this screen` at `/player` | duplicate submit blocked | automatic display runtime | approved content or unpublished waiting state | field-associated errors; focus pairing input; retry connection after uncertain completion | display surface / pairing input on failure | ADR 0004 |
+| Disconnect player | `Disconnect player` with expected player ID | shared app confirmation; initially focus Cancel | stay in selected screen | shared toast and Not paired state after server confirmation | dialog stays open; stale-player conflicts require refresh | original trigger if still mounted, otherwise next available control | ADR 0004 |
+
+### P0/P1 reconciliation note (2026-09-05)
+
+Older planned/Phase 6 descriptions in this contract describe the original migration baseline, not a fresh certification of every implemented feature. The current implemented/exposed/verified distinction is recorded in `docs/PLAYER_PILOT_BASELINE.md`. Campaign-v2 routes and activity aggregation exist, but full production funnel measurement, complete static fulfillment validation, persistent offline playback, and actual player proof of play are not established by the P0/P1 checks.
+
+The new `/player` route is separate from public displays and hides website language selection and chat during operation. Screen content follows the saved device locale; pairing/error controls follow the website locale. A fresh unpaired state is instructional, not a validation error. Owned English and French strings are in the existing locale catalog, with `fr-player.ts` supplying this feature's translations.
+
+Player status distinguishes connectivity, published/received/prepared/applied revisions, last applied time, and historical last error. Background status recovery clears its own transport error without erasing a mutation error. Last playback is derived only from authenticated completed events. ADR 0005 adds a configurable bounded offline lease (five minutes by default), persistent media, an outbox and interval evidence. Publication/approval rules, owner access and credential handling remain governed by ADR 0004 as amended by ADR 0005; this section does not replace those policies.
 
 ## Navigation and responsive behavior
 
@@ -208,3 +223,21 @@ The 2026-08-24 verification pass recorded zero strict premium-audit findings and
 - Project audit command/result: `audit_project.py <project-root> --mode strict` before completion.
 - CRUD full-flow evidence: Institutional network, `tests/institution-media-publishing-route.test.ts`, `tests/media-approval-route.test.ts`, and API/component tests.
 - Failure-path evidence: Permission, scope, pending-content exclusion, validation, duplicate-submit, and alert cancellation tests.
+
+### P2 implementation record (2026-09-05)
+
+The P0/P1 reconciliation note above is historical. `docs/PLAYER_RECOVERY_BASELINE.md` records P2 software behavior, verification and remaining hardware gates. Player acknowledgments, reported completed plays, manual declarations, demo ticks and audience estimates remain distinct. Read-only digital allocation copy appears before offline acceptance and explicitly states UTC / 24-hour operation / no dayparts. Unknown delivery does not become a missed-play claim.
+
+Offline media uses the same `DeviceScreen` layout and tokens; `PlayerRotation` is its business-specific evidence-producing media region. Public preview carousels never receive event callbacks. Local outbox writes are queued, bounded and scoped to the original paired identity. Storage failure pauses playback; cached content never overrides an explicit online stop or an expired lease. New copy uses the existing English-source/French catalog. The real 24-hour hardware soak and native French review remain release checks.
+
+## P3 advertiser and field operations
+
+Campaign detail owns the cost breakdown, persisted creative version reviews and per-placement readiness. Quote confirmation freezes estimate lines as confirmed terms; repeat campaign starts a fresh draft with blank dates. Placement-specific artwork may be submitted separately. Replacement artwork starts without approval and cannot silently replace printed work.
+
+StaticOperationsPanel owns phone assignment, private access notes, scheduling, upload retry and installation completion. Completion is server-authoritative and idempotent; blocked work requires rescheduling before completion. Completion photos are private by default and become client-visible only when explicitly shared. Both list and direct-photo APIs enforce that distinction. Static proof and digital player evidence remain separate.
+
+P3 verification and operating limits are recorded in `docs/ADVERTISER_STATIC_PILOT_BASELINE.md`.
+
+## P4 fleet operations
+
+Bulk operations act on explicit selected screens and show each target result. A stale version requires refresh before retry. Owners publish; department editors submit content for approval within their saved screen scope. Scope changes revoke sessions. Privacy is separate from advertising opt-in; changing visibility requires an empty screen. Alert receipt, application, browser rendering and restoration remain separate, and missing/stale reports never imply successful physical display. Fleet controls include English/French copy, labelled inputs, keyboard operation and a phone layout with horizontally scrollable alert columns.

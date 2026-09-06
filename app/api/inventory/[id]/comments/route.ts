@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "../../../../lib/auth";
+import { canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
 import { createInventoryComment, getInventory, listInventoryComments } from "../../../../lib/db";
 
 type RouteContext = {
@@ -14,6 +14,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const inventory = await getInventory(id);
   if (!inventory) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
+  if(inventory.contentVisibility==="private"&&!canManageInventoryRecord(user,inventory))return NextResponse.json({error:"Inventory not found"},{status:404});
   return NextResponse.json({
     comments: inventory.commentsEnabled === false ? [] : await listInventoryComments(id),
     commentsEnabled: inventory.commentsEnabled !== false,
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const inventory = await getInventory(id);
   if (!inventory) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
+  if(inventory.contentVisibility==="private"&&!canManageInventoryRecord(user,inventory))return NextResponse.json({error:"Inventory not found"},{status:404});
   if (inventory.commentsEnabled === false) {
     return NextResponse.json({ error: "Comments are turned off for this location" }, { status: 403 });
   }

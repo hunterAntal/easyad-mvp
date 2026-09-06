@@ -1,3 +1,4 @@
+import {fleetEnabled,fleetAudit} from "../../../lib/fleet";
 import { NextRequest, NextResponse } from "next/server";
 import { canManageInventory, canManageInventoryRecord, canPublishInventoryRecord, getCurrentUser } from "../../../lib/auth";
 import { deleteInventoryRecord, getInventory, updateInventoryRecord } from "../../../lib/db";
@@ -15,6 +16,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!current) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
   if (!canManageInventoryRecord(user, current)) return NextResponse.json({ error: "This device belongs to another institution" }, { status: 403 });
   const body = await request.json().catch(() => ({}));
+  if(["institutionId","ownerOrganizationId","contentVisibility","advertisingOptIn","reservedSeconds","restrictedCategories","building","department"].some(key=>key in body && JSON.stringify(body[key])!==JSON.stringify(current[key as keyof typeof current])))return NextResponse.json({error:"Use the owner fleet policy controls"},{status:422});
   const availabilityWindow = {
     availableFrom: "availableFrom" in body ? body.availableFrom : current.availableFrom,
     availableTo: "availableTo" in body ? body.availableTo : current.availableTo,
@@ -33,7 +35,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Institutions can publish or unpublish their devices; rejection is reserved for super admins" }, { status: 403 });
     }
   }
-  const item = await updateInventoryRecord(id, body);
+  const item = await updateInventoryRecord(id, body, user);
   if (!item) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
   return NextResponse.json({ item });
 }

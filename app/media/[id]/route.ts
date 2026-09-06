@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const [user, privateMedia] = await Promise.all([getCurrentUser(), getMediaResource(id)]);
     if (user && privateMedia) {
       const inventory = await getInventory(privateMedia.resource.inventoryId);
-      if (privateMedia.resource.ownerId === user.id || inventory && canManageInventoryRecord(user, inventory)) {
+      if (inventory && canManageInventoryRecord(user, inventory)) {
         entry = {
           originalName: privateMedia.resource.originalName,
           mimeType: privateMedia.resource.mimeType,

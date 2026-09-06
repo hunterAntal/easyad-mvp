@@ -26,6 +26,7 @@ export type DisplayTemplate = "fullscreen" | "weather" | "public-info" | "transi
 export const displayTemplates: DisplayTemplate[] = ["fullscreen", "weather", "public-info", "transit", "community"];
 
 export type InventoryItem = {
+  building?: string; department?: string; contentVisibility?: "public"|"private"; advertisingOptIn?: boolean; restrictedCategories?: string[]; reservedSeconds?: number; fleetVersion?: number;
   id: string;
   name: string;
   operator: string;
@@ -103,6 +104,7 @@ export type InventoryComment = {
 };
 
 export type MediaResource = {
+  startsAt?: string|null; endsAt?: string|null; revision?: number;
   id: string;
   inventoryId: string;
   ownerId: string;

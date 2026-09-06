@@ -1,5 +1,6 @@
 import type { InventoryAdvertiserResource, InventoryItem, MediaResource } from "../data";
-import { getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "./db";
+import type { PoolClient } from "pg";
+import { getInventory, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "./db";
 import { isDigitalInventory } from "./inventory-delivery";
 
 export type PublicDeviceMediaItem = {
@@ -27,14 +28,16 @@ export type ActiveDeviceMedia = {
 const activeBookingStatuses = new Set(["approved", "scheduled", "live"]);
 const supportedMimeTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm"]);
 
-export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate()) {
-  const inventory = await getPublishedInventory(deviceId);
-  if (!inventory || !isDigitalInventory(inventory)) return null;
+export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate(), client?: PoolClient, through = asOf, authenticated = false) {
+  const inventory = authenticated ? await getInventory(deviceId, client) : await getPublishedInventory(deviceId, client);
+  if (!inventory || inventory.approvalStatus!=="approved" || !isDigitalInventory(inventory)) return null;
   const [deviceResources, advertiserResources] = await Promise.all([
-    listMediaResources(deviceId),
-    listInventoryAdvertiserResources(deviceId, asOf),
+    listMediaResources(deviceId, client),
+    listInventoryAdvertiserResources(deviceId, asOf, client, through),
   ]);
-  return buildActiveDeviceMedia(inventory, deviceResources, advertiserResources, asOf);
+  const result=buildActiveDeviceMedia(inventory, deviceResources, advertiserResources, asOf, through);
+  if(!authenticated)result.items=result.items.filter(i=>i.source!=="device"||(!i.startsOn||Date.parse(i.startsOn)<=Date.now())&&(!i.endsOn||Date.parse(i.endsOn)>Date.now()));
+  return result;
 }
 
 export function buildActiveDeviceMedia(
@@ -42,9 +45,10 @@ export function buildActiveDeviceMedia(
   deviceResources: MediaResource[],
   advertiserResources: InventoryAdvertiserResource[],
   asOf = currentDate(),
+  through = asOf,
 ): ActiveDeviceMedia {
   const deviceItems = deviceResources
-    .filter((resource) => resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video") && supportedMimeTypes.has(resource.mimeType) && Boolean(resource.publicUrl))
+    .filter((resource) => resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video") && supportedMimeTypes.has(resource.mimeType) && Boolean(resource.publicUrl) && (!resource.startsAt || Date.parse(resource.startsAt)<=Date.parse(through)+86400000) && (!resource.endsAt || Date.parse(resource.endsAt)>Date.parse(asOf)))
     .map((resource) => ({
       id: resource.id,
       deviceId: inventory.id,
@@ -57,14 +61,14 @@ export function buildActiveDeviceMedia(
       createdAt: resource.createdAt,
       advertiser: null,
       campaign: null,
-      startsOn: null,
-      endsOn: null,
+      startsOn: resource.startsAt??null,
+      endsOn: resource.endsAt??null,
     }));
 
   const advertiserItems = advertiserResources
     .filter((resource) => resource.status === "approved"
       && activeBookingStatuses.has(resource.bookingStatus)
-      && resource.start <= asOf
+      && resource.start <= through
       && resource.end >= asOf
       && Boolean(resource.publicUrl)
       && Boolean(resource.mimeType && supportedMimeTypes.has(resource.mimeType)))

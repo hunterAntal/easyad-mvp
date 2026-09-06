@@ -1,3 +1,4 @@
+import {fleetEnabled,fleetAudit} from "../../../../lib/fleet";
 import { NextRequest, NextResponse } from "next/server";
 import { canManageInstitutionAlerts, getCurrentUser } from "../../../../lib/auth";
 import { endDeviceAlert, getDeviceAlert } from "../../../../lib/db";
@@ -20,6 +21,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   if (alert.status === "ended") return NextResponse.json({ alert });
 
-  const ended = await endDeviceAlert(id);
+  const ended = await endDeviceAlert(id,user.id);
   return NextResponse.json({ alert: ended ?? alert });
 }

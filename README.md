@@ -4,6 +4,16 @@ Next.js MVP for a multi-tenant out-of-home advertising marketplace.
 
 The staged digital/static roadmap is in [Development Plan](docs/DEVELOPMENT_PLAN.md). Phase 0 architecture decisions are recorded in [ADR 0001](docs/adr/0001-campaign-placement-domain.md) and [ADR 0002](docs/adr/0002-lifecycle-transition-authority.md); unresolved policy stays explicit in [Product Decisions](docs/PRODUCT_DECISIONS.md).
 
+The next implementation priorities, player reliability work, pilot milestones, and acceptance checks are in [Technical Improvement Plan](docs/TECHNICAL_IMPROVEMENT_PLAN.md).
+
+## Authenticated screen players (P1/P2)
+
+The paired browser player at `/player` automatically retrieves approved screen content and reports connection and content-revision acknowledgments. Enable `FEATURE_PLAYER_CONTROL=true` in an explicitly configured pilot environment and run the schema migration. In Screen control, the owning Institution account or Super Admin can create a one-time code, inspect player status, or disconnect a device. Enter that code on the display computer's `/player` page.
+
+Public device views and media APIs retain their existing behavior. Player acknowledgments do not claim completed playback or physical screen visibility; P2 adds bounded offline caching, scheduling and authenticated playback reports, which remain distinct from measured audience views.
+
+See [P2 recovery setup and release checks](docs/PLAYER_RECOVERY_BASELINE.md), [P0/P1 pilot setup and verification](docs/PLAYER_PILOT_BASELINE.md) and [the player protocol decision](docs/adr/0004-authenticated-browser-player.md). Use Node.js 24 and `npm ci` for the verified local runtime. `npm run test:pilot` runs tests in an isolated local test schema; after `npm run build`, `npm run test:pilot:e2e` exercises Chrome against a dedicated local server.
+
 ## Local PostgreSQL Database
 
 The app now uses PostgreSQL through `pg`. It reads `DATABASE_URL` first, then `POSTGRES_URL`, and falls back to:
@@ -115,3 +125,11 @@ FEATURE_PAYMENTS=false
 Roadmap features are opt-in and accept only the exact value `true`. Payment collection is out of scope and `FEATURE_PAYMENTS` must remain `false` outside an explicitly labelled demo environment.
 
 The application retains a startup schema check, but production releases should run the explicit migration first. Local development uses `.data/uploads`; S3 is required for durable media across multiple Fargate tasks.
+
+## Advertiser and static fulfillment pilot (P3)
+
+Campaigns now expose quote cost lines, persisted artwork approvals and placement readiness. Field operations support phone scheduling, assignment, recoverable uploads and private-by-default proof. Repeat campaign starts a fresh draft and requires new dates and confirmation. See [P3 verification and operating limits](docs/ADVERTISER_STATIC_PILOT_BASELINE.md).
+
+## Institutional fleet pilot (P4)
+
+Enable `FEATURE_FLEET_OPERATIONS=true` with authenticated player control for the authorized pilot. Owners can group screens, schedule reusable announcements, assign department scope, set privacy and advertising policy, and inspect per-player alert reports. See [P4 verification and rollout gates](docs/INSTITUTIONAL_FLEET_BASELINE.md) and [fleet policy decisions](docs/adr/0006-institutional-fleet-policy.md). Institutional SSO/MFA provider selection is deferred until requirements are confirmed before broader rollout.

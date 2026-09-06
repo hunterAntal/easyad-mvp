@@ -9,7 +9,7 @@ export async function GET(_request: NextRequest, context: Context) {
   const { id } = await context.params;
   const inventory = await getInventory(id);
   if (!inventory) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
-  if (inventory.approvalStatus !== "approved") {
+  if (inventory.approvalStatus !== "approved" || inventory.contentVisibility === "private") {
     const user = await getCurrentUser();
     if (!user || !canManageInventoryRecord(user, inventory)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

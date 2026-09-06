@@ -4,6 +4,8 @@ Snapshot date: 2026-08-24
 Scope: pre-campaign-v2 MVP  
 Privacy rule: no creative copy, alert text, access notes, credentials, file contents, or direct personal identifiers enter product-event properties.
 
+Update (2026-09-05): the current repository includes `activity_events` aggregation and campaign-state counts at `/api/metrics/funnel`. This file's original baseline is historical; those aggregate counts still do not establish complete production funnels, conversion denominators, abandonment rates, or a customer baseline. P0/P1 player verification and local latency samples are recorded separately in [the pilot baseline](PLAYER_PILOT_BASELINE.md) and exclude production activity.
+
 ## Current baseline
 
 The application does not currently have a production analytics sink or a canonical product-event table. Therefore the Phase 0 numerical baseline is **not available**, rather than inferred from demo seed data or login counts. Existing PostgreSQL booking, creative, transaction, and proof-of-play records can support operational checks, but they do not capture task starts, abandonments, revision reasons, static installation, or support requests consistently.

@@ -64,7 +64,7 @@ export function useI18n() {
 }
 
 export function isDeviceDisplayPath(pathname: string | null) {
-  return pathname === "/devices" || pathname?.startsWith("/devices/") === true;
+  return pathname === "/devices" || pathname?.startsWith("/devices/") === true || pathname === "/player";
 }
 
 export function WebsiteLanguageSelector({ placement = "floating" }: { placement?: "floating" | "embedded" }) {

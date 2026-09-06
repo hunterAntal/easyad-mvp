@@ -1,0 +1,15 @@
+{
+  "samples": [
+    8747,
+    10791,
+    10793,
+    9767,
+    10759
+  ],
+  "p95": 10793,
+  "unit": "ms",
+  "count": 5,
+  "pollMs": 10000,
+  "runtime": "Windows desktop Chrome",
+  "claims": "Applied acknowledgment only, not playback evidence"
+}

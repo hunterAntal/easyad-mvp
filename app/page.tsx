@@ -65,13 +65,13 @@ export default async function Page({ searchParams }: PageProps) {
 
   const institutionId = getInstitutionScope(user);
   const isUnassignedOperator = user?.role === "operator" && !institutionId;
-  const inventory = user?.role === "admin" ? await listInventory() : institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory();
-  const bookings = !user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listBookingsCreatedBy(user.id) : institutionId ? await listBookingsForInstitution(institutionId) : await listBookings();
-  const mediaResources = user?.role === "admin" ? await listMediaResources() : institutionId ? await listMediaResourcesForInstitution(institutionId) : [];
+  const inventory = (user?.role === "admin" ? await listInventory() : institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory()).filter(item=>user?.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(item.id));
+  const bookings = (!user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listBookingsCreatedBy(user.id) : institutionId ? await listBookingsForInstitution(institutionId) : await listBookings()).filter(b=>user?.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(b.inventoryId));
+  const mediaResources = (user?.role === "admin" ? await listMediaResources() : institutionId ? await listMediaResourcesForInstitution(institutionId) : []).filter(r=>inventory.some(i=>i.id===r.inventoryId));
   const deviceAlerts = user?.role === "admin" ? await listDeviceAlerts() : user?.role === "institutional" ? await listDeviceAlerts(user.id) : [];
   if (user?.role === "admin" || institutionId) await ensureBookingTransactions();
-  const transactions = !user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listTransactionsCreatedBy(user.id) : institutionId ? await listTransactionsForInstitution(institutionId) : await listTransactions();
-  const approvalHistory = user?.role === "admin" ? await listApprovalEvents() : institutionId ? await listApprovalEventsForInstitution(institutionId) : [];
+  const transactions = (!user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listTransactionsCreatedBy(user.id) : institutionId ? await listTransactionsForInstitution(institutionId) : await listTransactions()).filter(t=>user?.role!=="operator"||!Array.isArray(user.screenScope)||bookings.some(b=>b.id===t.bookingId));
+  const approvalHistory = (user?.role === "admin" ? await listApprovalEvents() : institutionId ? await listApprovalEventsForInstitution(institutionId) : []).filter(e=>user?.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(e.inventoryId));
   const bookingIds = new Set(bookings.map((booking) => booking.id));
   const allCreatives = user ? await listCreatives() : [];
   const creatives = user?.role === "admin" ? allCreatives : user ? allCreatives.filter((creative) => bookingIds.has(creative.bookingId)) : [];

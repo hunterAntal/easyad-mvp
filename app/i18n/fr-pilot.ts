@@ -1,0 +1,18 @@
+export const frPilot: Record<string,string> = {
+ "Artwork placement":"Emplacement de l’illustration", "All campaign placements":"Tous les emplacements de la campagne",
+ "Choose a valid planned date.":"Choisissez une date prévue valide.",
+ "Unavailable for selected dates":"Indisponible aux dates choisies",
+ "Quote cost breakdown":"Ventilation des coûts du devis", "Printing":"Impression", "Responsible person":"Personne responsable",
+ "Approved artwork ready":"Illustration approuvée prête", "Next action":"Prochaine action", "Confirm commercial terms":"Confirmer les conditions commerciales",
+ "Approve exact artwork version":"Approuver la version exacte de l’illustration", "Review proof of posting":"Consulter la preuve d’affichage",
+ "Resolve installation delay":"Résoudre le retard d’installation", "Complete production":"Terminer la production", "Review player evidence":"Consulter les preuves du lecteur",
+ "Share completion photos with client":"Partager les photos de réalisation avec le client", "Assigned to":"Responsable", "Unassigned":"Non attribué",
+ "Access instructions":"Instructions d’accès", "Completed at":"Terminé le", "Partial completion":"Réalisation partielle", "Reschedule":"Reporter",
+ "New date (YYYY-MM-DD)":"Nouvelle date (AAAA-MM-JJ)", "Upload failed. Retry this file.":"Échec du téléversement. Réessayez ce fichier.",
+ "Completion uncertain. Refresh server state before retrying.":"Réalisation incertaine. Actualisez l’état du serveur avant de réessayer.",
+ "Artwork version target":"Illustration à mettre à jour", "New artwork":"Nouvelle illustration", "Repeat":"Répétition", "Repeat campaign":"Répéter la campagne",
+ "Choose new dates. Availability, prices, specifications and approvals will be checked again.":"Choisissez de nouvelles dates. La disponibilité, les prix, les spécifications et les approbations seront vérifiés de nouveau.",
+ "Assigned user ID":"Identifiant du responsable", "Planned date":"Date prévue", "Save assignment and schedule":"Enregistrer l’affectation et la date",
+ "Update failed. Your input is preserved.":"Échec de la mise à jour. Votre saisie est conservée.", "Client approval":"Approbation du client", "Operator approval":"Approbation de l’exploitant",
+ "media":"Média", "design":"Conception", "installation":"Installation", "removal":"Retrait", "Estimate":"Estimation", "Confirmed":"Confirmé",
+};

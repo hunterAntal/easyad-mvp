@@ -1,10 +1,16 @@
+import {frFleet} from "./fr-fleet";
+import { frPilot } from "./fr-pilot";
 import type { Locale } from "./config";
 import { frAdditional } from "./fr-additional";
+import { frPlayer } from "./fr-player";
 
 type Variables = Record<string, string | number>;
 type Messages = Record<string, string>;
 
 const fr: Messages = {
+  ...frFleet,
+  ...frPilot,
+  ...frPlayer,
   "Language": "Langue",
   "English": "English",
   "French": "Français",

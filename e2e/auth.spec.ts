@@ -42,6 +42,14 @@ const accounts: { id: string; name: string; email: string; password: string; rol
   },
 ];
 
+test.beforeEach(async ({ page }) => {
+  // Keep map interaction checks independent of external tile-service availability.
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({
+    contentType: "image/png",
+    body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+  }));
+});
+
 test.beforeAll(async () => {
   const now = new Date().toISOString();
   await countUsers();

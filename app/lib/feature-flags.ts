@@ -19,12 +19,12 @@ const environmentKeys: Record<FeatureFlagName, string> = {
  * Flags are deliberately opt-in. Only the exact value "true" enables a flag;
  * missing, malformed, and differently-cased values remain off.
  */
-export function getFeatureFlags(environment: NodeJS.ProcessEnv = process.env): FeatureFlags {
+export function getFeatureFlags(environment: Record<string, string | undefined> = process.env): FeatureFlags {
   return Object.fromEntries(
     featureFlagNames.map((name) => [name, environment[environmentKeys[name]] === "true"]),
   ) as FeatureFlags;
 }
 
-export function isFeatureEnabled(name: FeatureFlagName, environment: NodeJS.ProcessEnv = process.env) {
+export function isFeatureEnabled(name: FeatureFlagName, environment: Record<string, string | undefined> = process.env) {
   return getFeatureFlags(environment)[name];
 }

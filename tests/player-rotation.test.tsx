@@ -1,0 +1,59 @@
+// @vitest-environment jsdom
+import React from "react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import type { PlayerManifest } from "../app/player-types";
+const mocks = vi.hoisted(() => ({ queue: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../app/lib/player-storage", () => ({ queuePlayback: mocks.queue }));
+vi.mock("../app/i18n/client", () => ({ useI18n: () => ({ t: (text: string) => text }) }));
+import PlayerRotation from "../app/component/player-rotation";
+const manifest: PlayerManifest = { playerId: "p", revision: 1, inventoryId: "i", inventoryName: "Screen", city: "City", generatedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 86400000).toISOString(), published: true, imageInterval: 2, template: "fullscreen", displayLanguage: "en", activeAlert: null, slides: [{ id: "s", assetVersion: "v", mediaType: "image", publicUrl: "/a.png", title: "", subtitle: "", createdAt: new Date().toISOString(), startsOn: null, endsOn: null, durationSeconds: 2 }] };
+beforeEach(() => { vi.useFakeTimers(); mocks.queue.mockReset().mockResolvedValue(undefined); Object.defineProperty(document, "hidden", { value: false, configurable: true }); vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(); vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => { }); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
+test("only decoded visible image intervals are successful, then another interval begins", async () => {
+    const view = render(<PlayerRotation manifest={manifest} onError={() => { }}/>);
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(mocks.queue).not.toHaveBeenCalled();
+    fireEvent.load(view.container.querySelector("img")!);
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(mocks.queue.mock.calls[0][1].outcome).toBe("completed");
+    await act(async () => vi.advanceTimersByTime(60));
+    fireEvent.load(view.container.querySelector("img")!);
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(mocks.queue).toHaveBeenCalledTimes(2);
+    expect(mocks.queue.mock.calls[1][1].eventId).not.toBe(mocks.queue.mock.calls[0][1].eventId);
+});
+test("hiding or unmounting an active image reports interruption", async () => {
+    const view = render(<PlayerRotation manifest={manifest} onError={() => { }}/>);
+    fireEvent.load(view.container.querySelector("img")!);
+    await act(async () => vi.advanceTimersByTime(500));
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    fireEvent(document, new Event("visibilitychange"));
+    await act(async () => { });
+    expect(mocks.queue.mock.calls[0][1].outcome).toBe("interrupted");
+    await act(async () => vi.advanceTimersByTime(10000));
+    expect(mocks.queue).toHaveBeenCalledTimes(1);
+});
+test("single video restarts; failed media advances without a successful play", async () => {
+    const videoManifest = { ...manifest, slides: [{ ...manifest.slides[0], mediaType: "video" as const }] };
+    const view = render(<PlayerRotation manifest={videoManifest} onError={() => { }}/>);
+    expect(view.container.querySelectorAll("video")).toHaveLength(1);
+    fireEvent.playing(view.container.querySelector("video")!);
+    await act(async () => vi.advanceTimersByTime(500));
+    fireEvent.ended(view.container.querySelector("video")!);
+    await act(async () => { });
+    expect(mocks.queue.mock.calls[0][1].outcome).toBe("completed");
+    await act(async () => vi.advanceTimersByTime(1600));
+    fireEvent.error(view.container.querySelector("video")!);
+    await act(async () => { });
+    expect(mocks.queue.mock.calls[1][1].outcome).toBe("failed");
+});
+test("outbox failure stops playback without silently discarding evidence", async () => {
+    mocks.queue.mockRejectedValue(new Error("full"));
+    const error = vi.fn();
+    const view = render(<PlayerRotation manifest={manifest} onError={error}/>);
+    fireEvent.load(view.container.querySelector("img")!);
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(error).toHaveBeenCalled();
+    expect(view.container.querySelector("img")).toBeNull();
+});

@@ -11,7 +11,7 @@ test.skipIf(!postgresUrl)("mixed campaigns are scoped, idempotent, snapshotted, 
   const advertiser = await db.createUser("Planner", "planner@example.test", "hash", "advertiser");
   const outsider = await db.createUser("Other planner", "other@example.test", "hash", "advertiser");
   const admin = await db.createUser("Admin", "admin@example.test", "hash", "admin");
-  const base = { operator:"Test operator",x:10,y:20,address:"Thunder Bay",price:100,impressions:1000,traffic:900,income:70000,audience:"Adults",competitor:"Low",occupancy:0,availableFrom:"2026-09-01",availableTo:"2027-09-01" };
+  const base = { operator:"Test operator",x:10,y:20,address:"Thunder Bay",price:100,impressions:1000,traffic:900,income:70000,audience:"Adults",competitor:"Low" as const,occupancy:0,imageInterval:6,maxLoopSeconds:120,availableFrom:"2026-09-01",availableTo:"2027-09-01" };
   const digital: InventoryItem = { ...base,id:"INV-DIGITAL",name:"Digital screen",format:"digital",deliveryMode:"digital",productType:"digital_screen" };
   const staticFace: InventoryItem = { ...base,id:"INV-STATIC",name:"Static face",format:"static",deliveryMode:"static",productType:"poster",productionLeadDays:7,installationLeadDays:3 };
   await db.createInventory(digital, admin.id); await db.createInventory(staticFace, admin.id);
@@ -27,8 +27,8 @@ test.skipIf(!postgresUrl)("mixed campaigns are scoped, idempotent, snapshotted, 
   const accepted = await campaigns.getCampaignDetail(advertiser,first); assert.equal(accepted?.campaign.status,"confirmed"); assert.equal(accepted?.quotes[0].status,"accepted_offline");
   process.env.FEATURE_CAMPAIGN_MODEL_V2="true";process.env.PLAYER_INGEST_TOKEN="test-player-token";const {POST:ingest}=await import("../app/api/delivery-events/route");const digitalPlacement=accepted?.placements.find((row:{delivery_mode:string})=>row.delivery_mode==="digital");assert.ok(digitalPlacement);
   const eventRequest=()=>new Request("http://localhost/api/delivery-events",{method:"POST",headers:{authorization:"Bearer test-player-token","idempotency-key":"miss-1","content-type":"application/json"},body:JSON.stringify({placementId:digitalPlacement.id,eventType:"missed",detail:"Player offline"})});
-  assert.equal((await ingest(eventRequest() as never)).status,201);assert.equal((await ingest(eventRequest() as never)).status,200);
-  assert.equal(Number((await db.getDb().query("SELECT COUNT(*) count FROM digital_delivery_events")).rows[0].count),1);assert.equal(Number((await db.getDb().query("SELECT COUNT(*) count FROM placement_issues WHERE issue_type='missed'")).rows[0].count),1);
+  assert.equal((await ingest()).status,410);assert.equal((await ingest()).status,410);
+  assert.equal(Number((await db.getDb().query("SELECT COUNT(*) count FROM digital_delivery_events")).rows[0].count),0);assert.equal(Number((await db.getDb().query("SELECT COUNT(*) count FROM placement_issues WHERE issue_type='missed'")).rows[0].count),0);
   const competing = await campaigns.createCampaignPlan(advertiser,{...input,name:"Competing",inventoryIds:[staticFace.id],idempotencyKey:"competing"});
   await campaigns.transitionCampaign(admin,competing,{action:"operator_confirm",expectedVersion:1});
   await assert.rejects(()=>campaigns.transitionCampaign(advertiser,competing,{action:"accept_offline",expectedVersion:2}),/already committed/);

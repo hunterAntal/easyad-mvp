@@ -1,3 +1,4 @@
+import {fleetEnabled,fleetAudit} from "../../../../lib/fleet";
 import { NextRequest, NextResponse } from "next/server";
 import { canDirectPublishInstitutionContent, canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
 import { createMediaResource, getInventory, listMediaResources } from "../../../../lib/db";

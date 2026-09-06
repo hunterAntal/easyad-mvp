@@ -7,7 +7,7 @@ import type { ChatMessage } from "../types";
 import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
 
-const devicePagePrefixes = ["/devices", "/inventory"] as const;
+const devicePagePrefixes = ["/devices", "/inventory", "/player"] as const;
 
 export function isDevicePage(pathname: string | null) {
   return devicePagePrefixes.some((prefix) => pathname === prefix || pathname?.startsWith(`${prefix}/`));

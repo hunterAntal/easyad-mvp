@@ -1,12 +1,14 @@
+import { allocation, checkDigitalCapacity, ScheduleError } from "./digital-schedule";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { ApprovalEvent, Booking, Creative, DeviceAlert, DeviceAlertType, DisplayTemplate, InventoryAdvertiserResource, InventoryComment, InventoryItem, InventorySpecification, MediaResource, MembershipRole, Organization, PopLog, Role, Transaction, TransactionStatus, UserStatus, displayTemplates } from "../data";
 import { isLocale, type Locale } from "../i18n/config";
 import { expectedPlays, splitRevenue } from "../utils";
 
 type UserRow = {
+  screen_scope?: string[]|null;
   id: string;
   name: string;
   email: string;
@@ -19,6 +21,7 @@ type UserRow = {
 };
 
 type InventoryRow = {
+  building: string; department: string; content_visibility: "public"|"private"; advertising_opt_in: boolean; restricted_categories: string[]; reserved_seconds: number; fleet_version:number;
   id: string;
   name: string;
   operator: string;
@@ -93,6 +96,7 @@ type ApprovalEventRow = {
 };
 
 type MediaRow = {
+  starts_at: string|null; ends_at:string|null; revision:number;
   id: string;
   inventory_id: string;
   owner_id: string;
@@ -192,6 +196,7 @@ type InventoryCommentRow = {
 };
 
 export type DbUser = {
+  screenScope?: string[]|null;
   id: string;
   name: string;
   email: string;
@@ -256,14 +261,14 @@ function databaseSslConfig() {
   return { rejectUnauthorized, ...(ca ? { ca } : {}) };
 }
 
-async function rows<T extends QueryResultRow>(sql: string, params: unknown[] = []) {
-  await ensureSchema();
-  const result = await getPool().query<T>(sql, params);
+async function rows<T extends QueryResultRow>(sql: string, params: unknown[] = [], client?: PoolClient) {
+  if (!client) await ensureSchema();
+  const result = await (client ?? getPool()).query<T>(sql, params);
   return result.rows;
 }
 
-async function row<T extends QueryResultRow>(sql: string, params: unknown[] = []) {
-  const result = await rows<T>(sql, params);
+async function row<T extends QueryResultRow>(sql: string, params: unknown[] = [], client?: PoolClient) {
+  const result = await rows<T>(sql, params, client);
   return result[0];
 }
 
@@ -293,7 +298,7 @@ export async function resetDatabaseForTests() {
   if (process.env.NODE_ENV !== "test") throw new Error("resetDatabaseForTests is only available during tests");
   await ensureSchema();
   await getPool().query(`
-    TRUNCATE idempotency_records, notifications, activity_events, placement_issues, digital_delivery_events, proof_records, work_order_evidence,
+    TRUNCATE fleet_audit, fleet_announcements, player_alert_state, player_pairing_limits, idempotency_records, notifications, activity_events, placement_issues, digital_delivery_events, proof_records, work_order_evidence,
       installation_work_orders, production_jobs, creative_assignments, creative_reviews, creative_versions, creative_assets,
       design_requests, commercial_acceptances, quote_line_items, quotes, placements, campaigns, client_authorizations,
       brands, agency_clients, inventory_specifications, organization_memberships, inventory_comments, approval_events,
@@ -317,8 +322,8 @@ export async function listInventoryByInstitution(institutionId: string) {
   return (await rows<InventoryRow>("SELECT * FROM inventory WHERE institution_id = $1 ORDER BY id", [institutionId])).map(mapInventory);
 }
 
-export async function getInventory(id: string) {
-  const entry = await row<InventoryRow>("SELECT * FROM inventory WHERE id = $1", [id]);
+export async function getInventory(id: string, client?: PoolClient) {
+  const entry = await row<InventoryRow>("SELECT * FROM inventory WHERE id = $1", [id], client);
   return entry ? mapInventory(entry) : null;
 }
 
@@ -353,7 +358,7 @@ export async function createInventorySpecification(inventoryId: string, specific
       VALUES ($1,$2,$3,'active',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20)`,
       [id, inventoryId, version, specification.trimWidthMm, specification.trimHeightMm, specification.visibleWidthMm, specification.visibleHeightMm, specification.bleedMm, specification.safeAreaMm, specification.scaleRatio, specification.minimumDpi, specification.colourSpace, JSON.stringify(specification.acceptedFileTypes), specification.maximumFileBytes, specification.substrate, specification.finishing, specification.templateUrl, specification.notes, userId, new Date().toISOString()]);
     await database.query("COMMIT");
-    return (await listInventorySpecifications(inventoryId))[0];
+    return mapInventorySpecification((await database.query<InventorySpecificationRow>("SELECT * FROM inventory_specifications WHERE id=$1", [id])).rows[0]);
   } catch (error) {
     await database.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -361,11 +366,11 @@ export async function createInventorySpecification(inventoryId: string, specific
 }
 
 export async function listPublishedInventory() {
-  return (await rows<InventoryRow>("SELECT * FROM inventory WHERE approval_status = 'approved' ORDER BY id")).map(mapInventory);
+  return (await rows<InventoryRow>("SELECT * FROM inventory WHERE approval_status = 'approved' AND content_visibility='public' AND advertising_opt_in=TRUE ORDER BY id")).map(mapInventory);
 }
 
-export async function getPublishedInventory(id: string) {
-  const entry = await row<InventoryRow>("SELECT * FROM inventory WHERE id = $1 AND approval_status = 'approved'", [id]);
+export async function getPublishedInventory(id: string, client?: PoolClient) {
+  const entry = await row<InventoryRow>("SELECT * FROM inventory WHERE id = $1 AND approval_status = 'approved' AND content_visibility='public'", [id], client);
   return entry ? mapInventory(entry) : null;
 }
 
@@ -385,23 +390,28 @@ export async function createInventory(item: InventoryItem, userId: string, insti
     (id, name, operator, format, x, y, address, price, impressions, traffic, income, audience, competitor, occupancy, image_interval, max_loop_seconds, available_from, available_to, approval_status, tags, display_template, comments_enabled, institution_id, created_by, created_at, updated_at, owner_organization_id, delivery_mode, product_type, production_lead_days, installation_lead_days, latitude, longitude, measurement_source, measurement_updated_at, display_language)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
   `, [item.id, item.name, item.operator, item.format, item.x, item.y, item.address, item.price, item.impressions, item.traffic, item.income, item.audience, item.competitor, item.occupancy, clampImageInterval(item.imageInterval), clampLoopCapacity(item.maxLoopSeconds), item.availableFrom, item.availableTo, item.approvalStatus ?? "approved", serializeTags(tags.length ? tags : suggestedTagsForInventory(item)), normalizeDisplayTemplate(item.displayTemplate), item.commentsEnabled !== false, institutionId, userId, now, now, ownerOrganizationId, item.deliveryMode ?? (item.format === "digital" ? "digital" : item.format === "static" ? "static" : "unknown"), item.productType ?? item.format, item.productionLeadDays ?? 0, item.installationLeadDays ?? 0, item.latitude ?? null, item.longitude ?? null, item.measurementSource ?? null, item.measurementUpdatedAt ?? null, normalizeDisplayLanguage(item.displayLanguage)]);
+  await exec("UPDATE inventory SET advertising_opt_in=$1 WHERE id=$2",[item.advertisingOptIn??!institutionId,item.id]);
   return getInventory(item.id);
 }
 
-export async function updateInventoryRecord(id: string, updates: Partial<InventoryItem>) {
+export async function updateInventoryRecord(id: string, updates: Partial<InventoryItem>, actor?:DbUser) {
   const current = await getInventory(id);
   if (!current) return null;
   const next = { ...current, ...updates };
-  await exec(`
+  const database=await getPool().connect();
+  try{await database.query("BEGIN");
+  await database.query(`
     UPDATE inventory SET
-      name = $1, operator = $2, format = $3, x = $4, y = $5, address = $6, price = $7, impressions = $8, traffic = $9, income = $10,
+      fleet_version=fleet_version+1, name = $1, operator = $2, format = $3, x = $4, y = $5, address = $6, price = $7, impressions = $8, traffic = $9, income = $10,
       audience = $11, competitor = $12, occupancy = $13, image_interval = $14, max_loop_seconds = $15, available_from = $16, available_to = $17,
       approval_status = $18, tags = $19::jsonb, display_template = $20, comments_enabled = $21, updated_at = $22,
       delivery_mode = $23, product_type = $24, production_lead_days = $25, installation_lead_days = $26,
       latitude = $27, longitude = $28, measurement_source = $29, measurement_updated_at = $30, display_language = $31
     WHERE id = $32
   `, [next.name, next.operator, next.format, next.x, next.y, next.address, next.price, next.impressions, next.traffic, next.income, next.audience, next.competitor, next.occupancy, clampImageInterval(next.imageInterval), clampLoopCapacity(next.maxLoopSeconds), next.availableFrom, next.availableTo, next.approvalStatus ?? "approved", serializeTags(next.tags), normalizeDisplayTemplate(next.displayTemplate), next.commentsEnabled !== false, new Date().toISOString(), next.deliveryMode ?? "unknown", next.productType ?? next.format, next.productionLeadDays ?? 0, next.installationLeadDays ?? 0, next.latitude ?? null, next.longitude ?? null, next.measurementSource ?? null, next.measurementUpdatedAt ?? null, normalizeDisplayLanguage(next.displayLanguage), id]);
-  return getInventory(id);
+  if(actor&&process.env.FEATURE_FLEET_OPERATIONS==="true")await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,action,revision,result) SELECT $1,$2,institution_id,id,'inventory_updated',fleet_version,'success' FROM inventory WHERE id=$3",[`AUD-${randomUUID()}`,actor.id,id]);
+  await database.query("COMMIT");return await getInventory(id,database);
+  }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
 }
 
 export async function deleteInventoryRecord(id: string) {
@@ -431,18 +441,28 @@ export async function listBookingsForInstitution(institutionId: string) {
 }
 
 export async function createBookingRecord(booking: Booking, userId: string) {
+  await ensureSchema();
+  const database = await getPool().connect();
+  try {
+  await database.query("BEGIN");
+  const unit=(await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE",[booking.inventoryId])).rows[0];
+  let snapshot = null;
+  if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)) { snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(booking.adSlots));await checkDigitalCapacity(database,booking.inventoryId,snapshot); }
   const now = new Date().toISOString();
-  await exec(`
+  await database.query(`
     INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
   `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, clampAdSlots(booking.adSlots), booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, now, now]);
-  await exec(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
+  await database.query(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
     SELECT 'CMP-LEGACY-' || $1,'ORG-' || $2,$3,'Legacy booking compatibility',inventory.address,$4,$5,'upload',$6,$2,$7,$7 FROM inventory WHERE inventory.id=$8
     ON CONFLICT(id) DO NOTHING`, [booking.id,userId,booking.campaign,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "planning",now,booking.inventoryId]);
-  await exec(`INSERT INTO placements (id,campaign_id,inventory_id,delivery_mode,start_date,end_date,status,estimated_media_cost,price_snapshot,created_at,updated_at)
+  await database.query(`INSERT INTO placements (id,campaign_id,inventory_id,delivery_mode,start_date,end_date,status,estimated_media_cost,price_snapshot,created_at,updated_at)
     SELECT 'PLC-LEGACY-' || $1,'CMP-LEGACY-' || $1,inventory.id,inventory.delivery_mode,$2,$3,$4,$5,$6::jsonb,$7,$7 FROM inventory WHERE inventory.id=$8
     ON CONFLICT(id) DO NOTHING`, [booking.id,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "requested",booking.spend,JSON.stringify({legacyBookingId:booking.id,amount:booking.spend,currency:"CAD",capturedAt:now}),now,booking.inventoryId]);
+  if(snapshot){await database.query("UPDATE bookings SET schedule_snapshot=$2::jsonb WHERE id=$1",[booking.id,JSON.stringify(snapshot)]);await database.query("UPDATE placements SET schedule_snapshot=$2::jsonb WHERE id='PLC-LEGACY-' || $1",[booking.id,JSON.stringify(snapshot)]);}
+  await database.query("COMMIT");
   return { ...booking, adSlots: clampAdSlots(booking.adSlots), createdBy: userId };
+  } catch(error) { await database.query("ROLLBACK");throw error; } finally { database.release(); }
 }
 
 export async function createBookingWithCreativeRecord(
@@ -456,6 +476,9 @@ export async function createBookingWithCreativeRecord(
   const adSlots = clampAdSlots(booking.adSlots);
   try {
     await database.query("BEGIN");
+    const unit=(await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE",[booking.inventoryId])).rows[0];
+    let snapshot=null;
+    if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)){snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,adSlots);await checkDigitalCapacity(database,booking.inventoryId,snapshot);}
     await database.query(`
       INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
@@ -470,6 +493,7 @@ export async function createBookingWithCreativeRecord(
       INSERT INTO creatives (id, booking_id, source, template, format, width, height, file_type, file_size, safe_zone, distortion, original_name, mime_type, public_url, storage_path, status, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     `, [creative.id, creative.bookingId, creative.source, creative.template, creative.format, creative.width, creative.height, creative.fileType, creative.fileSize, creative.safeZone, creative.distortion, creative.originalName, creative.mimeType, creative.publicUrl, creative.storagePath, creative.status, createdAt]);
+    if(snapshot){await database.query("UPDATE bookings SET schedule_snapshot=$2::jsonb WHERE id=$1",[booking.id,JSON.stringify(snapshot)]);await database.query("UPDATE placements SET schedule_snapshot=$2::jsonb WHERE id='PLC-LEGACY-' || $1",[booking.id,JSON.stringify(snapshot)]);}
     await database.query("COMMIT");
     const { storagePath: _storagePath, ...storedCreative } = creative;
     return {
@@ -485,18 +509,34 @@ export async function createBookingWithCreativeRecord(
 }
 
 export async function updateBookingRecord(id: string, updates: Partial<Booking>) {
-  const current = await getBooking(id);
-  if (!current) return null;
+  await ensureSchema();
+  const database = await getPool().connect();
+  try {
+  await database.query("BEGIN");
+  const locked = await database.query<BookingRow & {schedule_snapshot:import("./digital-schedule").Allocation|null}>("SELECT * FROM bookings WHERE id=$1 FOR UPDATE", [id]);
+  const current = locked.rows[0] ? mapBooking(locked.rows[0]) : null;
+  if (!current) { await database.query("COMMIT"); return null; }
   const next = { ...current, ...updates };
-  await exec(`
+  const unit = (await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE", [next.inventoryId])).rows[0];
+  if (unit?.delivery_mode === "digital" && ["approved", "scheduled", "live"].includes(next.status)) {
+    const existing = locked.rows[0].schedule_snapshot;
+    if(existing && (next.start!==existing.startDate || next.end!==existing.endDate || clampAdSlots(next.adSlots)!==existing.slots || next.inventoryId!==current.inventoryId))throw new ScheduleError("Confirmed digital allocation cannot be edited");
+    const snapshot = existing ?? allocation(next.start,next.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(next.adSlots));
+    await checkDigitalCapacity(database,next.inventoryId,snapshot,[id]);
+    await database.query("UPDATE bookings SET schedule_snapshot=$2::jsonb WHERE id=$1",[id,JSON.stringify(snapshot)]);
+  }
+  await database.query(`
     UPDATE bookings SET advertiser = $1, inventory_id = $2, campaign = $3, start_date = $4, end_date = $5, creative_status = $6,
       ad_slots = $7, status = $8, spend = $9, paid = $10, pop = $11, updated_at = $12
     WHERE id = $13
   `, [next.advertiser, next.inventoryId, next.campaign, next.start, next.end, next.creativeStatus, clampAdSlots(next.adSlots), next.status, next.spend, next.paid, next.pop, new Date().toISOString(), id]);
   const compatibilityStatus = next.status === "approved" ? "confirmed" : "requested";
-  await exec("UPDATE campaigns SET name=$1,start_date=$2,end_date=$3,status=$4,version=version+1,updated_at=$5 WHERE id='CMP-LEGACY-' || $6", [next.campaign,next.start,next.end,next.status === "approved" ? "confirmed" : "planning",new Date().toISOString(),id]);
-  await exec("UPDATE placements SET inventory_id=$1,start_date=$2,end_date=$3,status=$4,estimated_media_cost=$5,version=version+1,updated_at=$6 WHERE id='PLC-LEGACY-' || $7", [next.inventoryId,next.start,next.end,compatibilityStatus,next.spend,new Date().toISOString(),id]);
-  return getBooking(id);
+  await database.query("UPDATE campaigns SET name=$1,start_date=$2,end_date=$3,status=$4,version=version+1,updated_at=$5 WHERE id='CMP-LEGACY-' || $6", [next.campaign,next.start,next.end,next.status === "approved" ? "confirmed" : "planning",new Date().toISOString(),id]);
+  await database.query("UPDATE placements SET inventory_id=$1,start_date=$2,end_date=$3,status=$4,estimated_media_cost=$5,version=version+1,updated_at=$6 WHERE id='PLC-LEGACY-' || $7", [next.inventoryId,next.start,next.end,compatibilityStatus,next.spend,new Date().toISOString(),id]);
+  await database.query("UPDATE placements SET schedule_snapshot=(SELECT schedule_snapshot FROM bookings WHERE id=$1) WHERE id='PLC-LEGACY-' || $1",[id]);
+  await database.query("COMMIT");
+  return next;
+  } catch(error) { await database.query("ROLLBACK"); throw error; } finally { database.release(); }
 }
 
 export async function getBooking(id: string) {
@@ -683,7 +723,8 @@ export async function getPublicMediaResource(id: string) {
     JOIN inventory ON inventory.id = media_resources.inventory_id
     WHERE media_resources.id = $1
       AND media_resources.approval_status = 'approved'
-      AND inventory.approval_status = 'approved'
+      AND inventory.approval_status = 'approved' AND inventory.content_visibility='public'
+      AND (media_resources.starts_at IS NULL OR media_resources.starts_at::timestamptz <= NOW()) AND (media_resources.ends_at IS NULL OR media_resources.ends_at::timestamptz > NOW())
   `, [id]);
   if (media) return {
     originalName: media.original_name ?? "media-resource",
@@ -695,8 +736,8 @@ export async function getPublicMediaResource(id: string) {
   const creative = await row<PublicMediaRow>(`
     SELECT creatives.original_name, creatives.mime_type, creatives.storage_path
     FROM creatives
-    JOIN bookings ON bookings.id = creatives.booking_id
-    WHERE creatives.id = $1
+    JOIN bookings ON bookings.id = creatives.booking_id JOIN inventory private_guard ON private_guard.id=bookings.inventory_id
+    WHERE private_guard.content_visibility='public' AND creatives.id = $1
       AND creatives.source = 'upload'
       AND creatives.status = 'approved'
       AND creatives.storage_path IS NOT NULL
@@ -712,7 +753,7 @@ export async function getPublicMediaResource(id: string) {
   } : null;
 }
 
-export async function listInventoryAdvertiserResources(inventoryId: string, asOf = new Date().toISOString().slice(0, 10)) {
+export async function listInventoryAdvertiserResources(inventoryId: string, asOf = new Date().toISOString().slice(0, 10), client?: PoolClient, through = asOf) {
   const result = await rows<InventoryAdvertiserResourceRow>(`
     SELECT
       creatives.*,
@@ -728,10 +769,10 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
       AND creatives.status = 'approved'
       AND creatives.public_url IS NOT NULL
       AND bookings.status IN ('approved', 'scheduled', 'live')
-      AND bookings.start_date <= $2
+      AND bookings.start_date <= $3
       AND bookings.end_date >= $2
     ORDER BY creatives.created_at DESC
-  `, [inventoryId, asOf]);
+  `, [inventoryId, asOf, through], client);
 
   return result.map((entry) => ({
     ...mapCreative(entry),
@@ -743,10 +784,10 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
   } satisfies InventoryAdvertiserResource));
 }
 
-export async function listMediaResources(inventoryId?: string) {
+export async function listMediaResources(inventoryId?: string, client?: PoolClient) {
   const result = inventoryId
-    ? await rows<MediaRow>("SELECT * FROM media_resources WHERE inventory_id = $1 ORDER BY created_at DESC", [inventoryId])
-    : await rows<MediaRow>("SELECT * FROM media_resources ORDER BY created_at DESC");
+    ? await rows<MediaRow>("SELECT * FROM media_resources WHERE inventory_id = $1 ORDER BY created_at DESC", [inventoryId], client)
+    : await rows<MediaRow>("SELECT * FROM media_resources ORDER BY created_at DESC", [], client);
   return result.map(mapMedia);
 }
 
@@ -772,17 +813,25 @@ export async function deleteMediaResource(id: string) {
 }
 
 export async function createMediaResource(resource: MediaResource & { storagePath: string }) {
-  await exec(`
+  await ensureSchema();
+  const database=await getPool().connect();
+  try{await database.query("BEGIN");
+  await database.query("SELECT id FROM inventory WHERE id=$1 FOR SHARE",[resource.inventoryId]);
+  await database.query(`
     INSERT INTO media_resources
     (id, inventory_id, owner_id, title, original_name, mime_type, media_type, approval_status, size_bytes, storage_path, public_url, created_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
   `, [resource.id, resource.inventoryId, resource.ownerId, resource.title, resource.originalName, resource.mimeType, resource.mediaType, resource.approvalStatus, resource.sizeBytes, resource.storagePath, resource.publicUrl, resource.createdAt]);
-  return resource;
+  if(process.env.FEATURE_FLEET_OPERATIONS==="true")await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,action,revision,result) SELECT $1,$2,institution_id,id,'media_uploaded',1,'success' FROM inventory WHERE id=$3",[`AUD-${randomUUID()}`,resource.ownerId,resource.inventoryId]);
+  await database.query("COMMIT");return resource;
+  }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
 }
 
-export async function updateMediaApprovalStatus(id: string, approvalStatus: MediaResource["approvalStatus"]) {
-  const result = await exec("UPDATE media_resources SET approval_status = $1 WHERE id = $2", [approvalStatus, id]);
-  return result.rowCount ? (await getMediaResource(id))?.resource ?? null : null;
+export async function updateMediaApprovalStatus(id:string,approvalStatus:MediaResource["approvalStatus"],actorId?:string){
+ await ensureSchema();const database=await getPool().connect();try{await database.query("BEGIN");const result=await database.query<MediaRow>("UPDATE media_resources SET approval_status=$1,revision=revision+1 WHERE id=$2 RETURNING *",[approvalStatus,id]);const media=result.rows[0];
+ if(media&&actorId&&process.env.FEATURE_FLEET_OPERATIONS==="true")await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,action,revision,result) SELECT $1,$2,institution_id,id,$3,$4,$5,'success' FROM inventory WHERE id=$6",[`AUD-${randomUUID()}`,actorId,id,`media_${approvalStatus}`,media.revision,media.inventory_id]);
+ await database.query("COMMIT");return media?mapMedia(media):null;
+ }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
 }
 
 export async function listDeviceAlerts(institutionId?: string, asOf = new Date().toISOString()) {
@@ -811,7 +860,7 @@ export async function getDeviceAlert(id: string) {
   return entry ? mapDeviceAlert(entry) : null;
 }
 
-export async function getActiveDeviceAlertForDevice(deviceId: string, asOf = new Date().toISOString()) {
+export async function getActiveDeviceAlertForDevice(deviceId: string, asOf = new Date().toISOString(), client?: PoolClient) {
   const entry = await row<DeviceAlertRow>(`
     SELECT * FROM device_alerts
     WHERE status = 'active'
@@ -819,7 +868,7 @@ export async function getActiveDeviceAlertForDevice(deviceId: string, asOf = new
       AND target_device_ids ? $2
     ORDER BY created_at DESC
     LIMIT 1
-  `, [asOf, deviceId]);
+  `, [asOf, deviceId], client);
   return entry ? mapDeviceAlert(entry) : null;
 }
 
@@ -853,6 +902,7 @@ export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id
     }
 
     await database.query(deviceAlertInsertSql, deviceAlertInsertParams(created));
+    if(process.env.FEATURE_FLEET_OPERATIONS==="true")for(const target of created.targetDeviceIds)await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,target_scope,action,revision,result,priority) VALUES($1,$2,$3,$4,$5,$6::jsonb,'alert_created',1,'success','emergency')",[`AUD-${randomUUID()}`,created.createdBy,created.institutionId,target,created.id,JSON.stringify(created.targetDeviceIds)]);
     await database.query("COMMIT");
     return { alert: created, conflictingAlert: null };
   } catch (error) {
@@ -863,10 +913,11 @@ export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id
   }
 }
 
-export async function endDeviceAlert(id: string) {
-  const endedAt = new Date().toISOString();
-  const result = await exec("UPDATE device_alerts SET status = 'ended', ended_at = $1 WHERE id = $2 AND status = 'active'", [endedAt, id]);
-  return result.rowCount ? getDeviceAlert(id) : null;
+export async function endDeviceAlert(id:string,actorId?:string){
+ await ensureSchema();const database=await getPool().connect();try{await database.query("BEGIN");const result=await database.query<DeviceAlertRow>("UPDATE device_alerts SET status='ended',ended_at=$1 WHERE id=$2 AND status='active' RETURNING *",[new Date().toISOString(),id]);const alert=result.rows[0]?mapDeviceAlert(result.rows[0]):null;
+ if(alert&&actorId&&process.env.FEATURE_FLEET_OPERATIONS==="true")for(const target of alert.targetDeviceIds)await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,target_scope,action,revision,result,priority) VALUES($1,$2,$3,$4,$5,$6::jsonb,'alert_ended',1,'success','emergency')",[`AUD-${randomUUID()}`,actorId,alert.institutionId,target,id,JSON.stringify(alert.targetDeviceIds)]);
+ await database.query("COMMIT");return alert;
+ }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
 }
 
 export async function getUserByEmail(email: string) {
@@ -911,11 +962,11 @@ export async function listNonAdminUsers() {
 }
 
 export async function listInstitutionOperators(institutionId: string) {
-  return (await rows<UserRow>("SELECT * FROM users WHERE role = 'operator' AND institution_id = $1 ORDER BY created_at DESC, lower(name)", [institutionId])).map(mapUser);
+  return (await rows<UserRow>("SELECT * FROM users WHERE role = 'operator' AND status='active' AND institution_id = $1 ORDER BY created_at DESC, lower(name)", [institutionId])).map(mapUser);
 }
 
 export async function countInstitutionOperators(institutionId: string) {
-  const entry = await row<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE role = 'operator' AND institution_id = $1", [institutionId]);
+  const entry = await row<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE role = 'operator' AND status='active' AND institution_id = $1", [institutionId]);
   return Number(entry?.count ?? 0);
 }
 
@@ -930,7 +981,7 @@ export async function updateManagedUser(id: string, updates: { role?: Exclude<Ro
   if (current.role === "institutional" && role !== "institutional" && await countInstitutionOperators(current.id) > 0) return null;
   if (role === "institutional" && operatorLimit < await countInstitutionOperators(current.id)) return null;
   await exec("UPDATE users SET role = $1, status = $2, institution_id = $3, operator_limit = $4 WHERE id = $5", [role, status, institutionId, operatorLimit, id]);
-  if (status === "banned") await deleteSessionsForUser(id);
+  if (status === "banned" || role!==current.role || institutionId!==current.institutionId) await deleteSessionsForUser(id);
   return getUserById(id);
 }
 
@@ -1005,6 +1056,7 @@ function mapInventoryComment(entry: InventoryCommentRow): InventoryComment {
 
 function mapInventory(entry: InventoryRow): InventoryItem {
   return {
+    building:entry.building,department:entry.department,contentVisibility:entry.content_visibility,advertisingOptIn:entry.advertising_opt_in,restrictedCategories:entry.restricted_categories,reservedSeconds:entry.reserved_seconds,fleetVersion:entry.fleet_version,
     id: entry.id,
     name: entry.name,
     operator: entry.operator,
@@ -1150,6 +1202,7 @@ function mapApprovalEvent(entry: ApprovalEventRow): ApprovalEvent {
 
 function mapMedia(entry: MediaRow): MediaResource {
   return {
+    startsAt:entry.starts_at,endsAt:entry.ends_at,revision:entry.revision,
     id: entry.id,
     inventoryId: entry.inventory_id,
     ownerId: entry.owner_id,
@@ -1204,6 +1257,7 @@ function deviceAlertInsertParams(alert: DeviceAlert) {
 
 function mapUser(entry: UserRow): DbUser {
   return {
+    screenScope:entry.screen_scope??null,
     id: entry.id,
     name: entry.name,
     email: entry.email,

@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/e2e-preflight.cjs && playwright test",
+    "test:pilot": "node scripts/verify-pilot.cjs test",
+    "test:pilot:e2e": "node scripts/verify-pilot.cjs browser",
     "test:all": "npm run test && npm run test:e2e",
     "verify": "npm run test && npm run build"
   },

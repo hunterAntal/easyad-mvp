@@ -186,9 +186,9 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       SELECT
         'ALT-HISTORY-' || LPAD(entry::text, 3, '0'), $1, 'public-safety', 'Historical alert', 'Already ended', 'Database Way',
         'ended', '[]'::jsonb, 'Temporary Admin', $1,
-        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-        TO_CHAR($2::timestamptz + entry * INTERVAL '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+        TO_CHAR(($2::timestamptz + entry * INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        TO_CHAR(($2::timestamptz + entry * INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        TO_CHAR(($2::timestamptz + entry * INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
       FROM generate_series(1, 101) AS entry
     `, [user.id, deviceAlert!.createdAt]);
     const alertHistory = await db.listDeviceAlerts(user.id);

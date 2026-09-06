@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!isFeatureEnabled("agency_workspace")) return NextResponse.json({ error: "Not available" }, { status: 404 });
   const user = await getCurrentUser(); if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const form = await request.formData(); const campaignId = String(form.get("campaignId") ?? ""); const existingAssetId = String(form.get("assetId") ?? ""); const file = form.get("file");
+  const form = await request.formData(); const campaignId = String(form.get("campaignId") ?? ""); const placementId=String(form.get("placementId")??""); const existingAssetId = String(form.get("assetId") ?? ""); const file = form.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "Choose an artwork file" }, { status: 422 });
   await initializeDatabase();
   const orgs = await organizationIdsForUser(user);
@@ -29,11 +29,13 @@ export async function POST(request: NextRequest) {
   const organizationId = campaign.rows[0]?.organization_id; if (!organizationId) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   const membership = await getOrganizationMembership(user.id, organizationId);
   if (!hasCapability("creative.write", { membershipRole: membership?.membership_role, legacyRole: user.role })) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if(placementId){const target=await getDb().query("SELECT id FROM placements WHERE id=$1 AND campaign_id=$2 AND status<>'cancelled'",[placementId,campaignId]);if(!target.rows[0])return NextResponse.json({error:"Placement is outside this campaign"},{status:422});}
   const specs = await getDb().query<{ accepted_file_types: string[]; maximum_file_bytes: string | null }>(`SELECT specification_snapshot->'accepted_file_types' accepted_file_types, specification_snapshot->>'maximum_file_bytes' maximum_file_bytes
-    FROM placements WHERE campaign_id=$1 AND delivery_mode='static' AND specification_snapshot IS NOT NULL`, [campaignId]);
-  const allowed = specs.rows.length ? specs.rows.flatMap((row) => Array.isArray(row.accepted_file_types) ? row.accepted_file_types : []) : ["pdf", "png", "jpg"];
+    FROM placements WHERE campaign_id=$1 AND delivery_mode='static' AND specification_snapshot IS NOT NULL AND ($2='' OR id=$2)`, [campaignId,placementId]);
+  const allowed = specs.rows.length ? specs.rows.reduce<string[]>((types,row)=>types.filter(type=>Array.isArray(row.accepted_file_types)&&row.accepted_file_types.includes(type)),["pdf","png","jpg"]) : ["pdf", "png", "jpg"];
   const maximum = specs.rows.reduce((value, row) => row.maximum_file_bytes ? Math.min(value, Number(row.maximum_file_bytes)) : value, 50 * 1024 * 1024);
-  const inspected = await inspectCreativeUpload(file, allowed.length ? allowed : ["pdf", "png", "jpg"], maximum);
+  if(!allowed.length)return NextResponse.json({error:"These placements require separate artwork files"},{status:422});
+  const inspected = await inspectCreativeUpload(file, allowed, maximum);
   if (!inspected) return NextResponse.json({ error: "The file signature, type, or size does not match the selected placement specifications" }, { status: 422 });
   const assetId = existingAssetId || id("AST"); const versionId = id("CRV"); const checksum = createHash("sha256").update(inspected.bytes).digest("hex"); const now = new Date().toISOString();
   const storagePath = await storeMedia(`creative/${organizationId}/${assetId}/${versionId}.${inspected.extension}`, inspected.bytes, inspected.mimeType);
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
     const next = await client.query<{ version: number }>("SELECT COALESCE(MAX(version),0)+1 version FROM creative_versions WHERE asset_id=$1", [assetId]);
     const version = Number(next.rows[0]?.version ?? 1);
-    const preflight = { signatureVerified: true, manualChecks: ["colour_space", "font_outlines", "effective_dpi", "complex_pdf"], specificationCount: specs.rows.length };
+    const preflight = { ...(placementId?{placementIds:[placementId]}:{}), signatureVerified: true, manualChecks: ["colour_space", "font_outlines", "effective_dpi", "complex_pdf"], specificationCount: specs.rows.length };
     await client.query("INSERT INTO creative_versions (id,asset_id,version,original_name,mime_type,size_bytes,storage_path,checksum,status,preflight,created_by,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'submitted',$9::jsonb,$10,$11)", [versionId, assetId, version, file.name, inspected.mimeType, inspected.bytes.byteLength, storagePath, checksum, JSON.stringify(preflight), user.id, now]);
     await client.query("UPDATE design_requests SET status='in_review',version=version+1,updated_at=$1 WHERE campaign_id=$2", [now, campaignId]);
     await client.query("INSERT INTO activity_events (id,organization_id,actor_id,subject_type,subject_id,action,next_state,metadata,retention_until,created_at) VALUES ($1,$2,$3,'creative_version',$4,'uploaded','submitted',$5::jsonb,$6,$7)", [id("EVT"), organizationId, user.id, versionId, JSON.stringify({ assetId, version }), retention(now), now]);

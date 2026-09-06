@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, context: Context) {
     WHERE creative_versions.id=$1 AND creative_assets.organization_id=ANY($2::text[])`, [versionId, orgs]);
   const version = found.rows[0]; if (!version) return NextResponse.json({ error: "Creative version not found" }, { status: 404 });
   const membership = await getOrganizationMembership(user.id, version.organization_id);
-  if (reviewType === "operator" && !hasCapability("creative.operator_approve", { membershipRole: membership?.membership_role, legacyRole: user.role })) return NextResponse.json({ error: "Operator review authority is required" }, { status: 403 });
+  if (reviewType === "operator" && (!["admin","operator","institutional"].includes(user.role) || !hasCapability("creative.operator_approve", { membershipRole: membership?.membership_role, legacyRole: user.role }))) return NextResponse.json({ error: "Operator review authority is required" }, { status: 403 });
   let authorizationId: string | null = null;
   if (reviewType === "client") {
     const capability = hasCapability("creative.client_approve", { membershipRole: membership?.membership_role, legacyRole: user.role });
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest, context: Context) {
   const client = await getDb().connect(); const now = new Date().toISOString();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT id FROM creative_assets WHERE id=$1 FOR UPDATE",[version.asset_id]);
     const latest = await client.query<{ version: number }>("SELECT version FROM creative_versions WHERE asset_id=$1 ORDER BY version DESC LIMIT 1 FOR SHARE", [version.asset_id]);
     if (Number(latest.rows[0]?.version) !== version.version) { await client.query("ROLLBACK"); return NextResponse.json({ error: "A newer creative version exists; review that version instead" }, { status: 409 }); }
     const duplicate = await client.query("SELECT id FROM creative_reviews WHERE creative_version_id=$1 AND review_type=$2", [versionId, reviewType]);
@@ -44,13 +45,13 @@ export async function POST(request: NextRequest, context: Context) {
     await client.query("UPDATE creative_versions SET status=$1 WHERE id=$2", [status, versionId]);
     if (fullyApproved) {
       const placements = await client.query<{ id: string; delivery_mode: string; start_date: string; end_date: string; specification_snapshot: { substrate?: string; finishing?: string } | null }>(`SELECT placements.id,placements.delivery_mode,placements.start_date,placements.end_date,placements.specification_snapshot
-        FROM placements JOIN creative_assets ON creative_assets.campaign_id=placements.campaign_id WHERE creative_assets.id=$1`, [version.asset_id]);
+        FROM placements JOIN creative_assets ON creative_assets.campaign_id=placements.campaign_id JOIN creative_versions reviewed ON reviewed.id=$2 WHERE creative_assets.id=$1 AND placements.status<>'cancelled' AND (NOT(reviewed.preflight ? 'placementIds') OR reviewed.preflight->'placementIds' ? placements.id)`, [version.asset_id,versionId]);
       for (const placement of placements.rows) {
         await client.query("INSERT INTO creative_assignments (placement_id,creative_version_id,assigned_by,created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [placement.id, versionId, user.id, now]);
         if (placement.delivery_mode === "static") {
           const jobId = id("PRD"); const orderId = id("IWO");
           await client.query(`INSERT INTO production_jobs (id,placement_id,creative_version_id,substrate,finishing,target_completion,status,retention_until,created_at,updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,'ready',$7,$8,$8) ON CONFLICT(placement_id) DO NOTHING`, [jobId, placement.id, versionId, placement.specification_snapshot?.substrate ?? null, placement.specification_snapshot?.finishing ?? null, placement.start_date, retention(now), now]);
+            VALUES ($1,$2,$3,$4,$5,$6,'ready',$7,$8,$8) ON CONFLICT(placement_id) DO UPDATE SET creative_version_id=EXCLUDED.creative_version_id,version=production_jobs.version+1,updated_at=EXCLUDED.updated_at WHERE production_jobs.status IN ('not_ready','ready','reprint_required')`, [jobId, placement.id, versionId, placement.specification_snapshot?.substrate ?? null, placement.specification_snapshot?.finishing ?? null, placement.start_date, retention(now), now]);
           await client.query(`INSERT INTO installation_work_orders (id,placement_id,work_type,status,planned_at,retention_until,created_at,updated_at)
             SELECT $1,$2,'install','not_ready',$3,$4,$5,$5 WHERE NOT EXISTS (SELECT 1 FROM installation_work_orders WHERE placement_id=$2 AND work_type='install')`, [orderId, placement.id, placement.start_date, retention(now), now]);
           await client.query(`INSERT INTO installation_work_orders (id,placement_id,work_type,status,planned_at,retention_until,created_at,updated_at)

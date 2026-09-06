@@ -15,7 +15,7 @@ export async function GET() {
   const institutionId = getInstitutionScope(user);
   if (user.role === "operator" && !institutionId) return NextResponse.json({ error: "Operator must belong to an institution" }, { status: 403 });
   const bookings = user.role === "advertiser" ? await listBookingsCreatedBy(user.id) : institutionId ? await listBookingsForInstitution(institutionId) : await listBookings();
-  return NextResponse.json({ bookings });
+  return NextResponse.json({ bookings: bookings.filter(b=>user.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(b.inventoryId)) });
 }
 
 export async function POST(request: NextRequest) {
@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
   const inventoryId = String(body.inventoryId ?? "");
   const item = await getInventory(inventoryId);
   if (!item) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
+  if(item.contentVisibility==="private"||item.advertisingOptIn===false)return NextResponse.json({error:"The owner has not enabled marketplace advertising"},{status:409});
+  if((item.restrictedCategories??[]).includes("general"))return NextResponse.json({error:"This screen requires a categorized campaign plan"},{status:409});
   if (upload.extension === "gif" && !isDigitalInventory(item)) {
     return NextResponse.json({ error: "Animated GIF creative is available for digital inventory only" }, { status: 422 });
   }

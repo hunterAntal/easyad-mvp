@@ -11,13 +11,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   if (user.role === "admin") return NextResponse.json({ inventory: await listInventory() });
   const institutionId = getInstitutionScope(user);
-  return NextResponse.json({ inventory: institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory() });
+  return NextResponse.json({ inventory: (institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory()).filter(item=>user.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(item.id)) });
 }
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user || !canManageInventory(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
+  if(user.role==="operator"&&Array.isArray(user.screenScope))return NextResponse.json({error:"Department editors cannot create unscoped screens"},{status:403});
   const body = await request.json().catch(() => ({}));
   const institutionId = getInstitutionScope(user);
   if (user.role !== "admin" && !institutionId) {

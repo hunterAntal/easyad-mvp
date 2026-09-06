@@ -4,19 +4,33 @@ import { getCurrentUser } from "../../../lib/auth";
 import { getDb } from "../../../lib/db";
 import { organizationIdsForUser } from "../../../lib/campaigns";
 import { isFeatureEnabled } from "../../../lib/feature-flags";
-type Context = { params: Promise<{ id: string }> };
+import { productionTransitions } from "../../../lib/fulfillment-policy";
 
+type Context = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, context: Context) {
-  if (!isFeatureEnabled("static_fulfillment")) return NextResponse.json({ error: "Not available" }, { status: 404 });
-  const user = await getCurrentUser(); if (!user || !["admin", "operator", "institutional"].includes(user.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = await request.json().catch(() => ({})); const next = String(body.status ?? "");
-  if (!["ready", "in_production", "printed", "shipped", "delivered", "reprint_required"].includes(next)) return NextResponse.json({ error: "Invalid production status" }, { status: 422 });
-  const orgs = await organizationIdsForUser(user); const id = (await context.params).id; const now = new Date().toISOString();
-  const result = await getDb().query<{ placement_id: string; version: number }>(`UPDATE production_jobs SET status=$1,vendor_organization_id=COALESCE($2,vendor_organization_id),substrate=COALESCE($3,substrate),finishing=COALESCE($4,finishing),target_completion=COALESCE($5,target_completion),version=version+1,updated_at=$6
-    WHERE id=$7 AND version=$8 AND EXISTS (SELECT 1 FROM placements JOIN campaigns ON campaigns.id=placements.campaign_id JOIN inventory ON inventory.id=placements.inventory_id WHERE placements.id=production_jobs.placement_id AND (campaigns.organization_id=ANY($9::text[]) OR inventory.owner_organization_id=ANY($9::text[])))
-    RETURNING placement_id,version`, [next, body.vendorOrganizationId ?? null, body.substrate ?? null, body.finishing ?? null, body.targetCompletion ?? null, now, id, Number(body.expectedVersion), orgs]);
-  if (!result.rows[0]) return NextResponse.json({ error: "Production job changed or was not found" }, { status: 409 });
-  if (next === "delivered") await getDb().query("UPDATE installation_work_orders SET status='ready',version=version+1,updated_at=$1 WHERE placement_id=$2 AND work_type='install' AND status='not_ready'", [now, result.rows[0].placement_id]);
-  await getDb().query("INSERT INTO activity_events (id,organization_id,actor_id,subject_type,subject_id,action,next_state,created_at) SELECT $1,campaigns.organization_id,$2,'production_job',$3,'status_changed',$4,$5 FROM production_jobs JOIN placements ON placements.id=production_jobs.placement_id JOIN campaigns ON campaigns.id=placements.campaign_id WHERE production_jobs.id=$3", [`EVT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`, user.id, id, next, now]);
-  return NextResponse.json({ id, status: next, version: result.rows[0].version });
+  if (!isFeatureEnabled("static_fulfillment")) return NextResponse.json({error:"Not available"},{status:404});
+  const user=await getCurrentUser();
+  if(!user||!["admin","operator","institutional"].includes(user.role)) return NextResponse.json({error:"Forbidden"},{status:403});
+  const body=await request.json().catch(()=>({})); const next=String(body.status??"");
+  const orgs=await organizationIdsForUser(user); const id=(await context.params).id; const client=await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    const result=await client.query(`SELECT j.*,p.status placement_status,v.status creative_status,c.organization_id
+      FROM production_jobs j JOIN placements p ON p.id=j.placement_id JOIN campaigns c ON c.id=p.campaign_id
+      JOIN inventory i ON i.id=p.inventory_id LEFT JOIN creative_versions v ON v.id=j.creative_version_id
+      WHERE j.id=$1 AND (c.organization_id=ANY($2::text[]) OR i.owner_organization_id=ANY($2::text[])) FOR UPDATE OF j,p`,[id,orgs]);
+    const job=result.rows[0];
+    if(!job) { await client.query("ROLLBACK"); return NextResponse.json({error:"Production job not found"},{status:404}); }
+    if(job.version!==Number(body.expectedVersion)) { await client.query("ROLLBACK"); return NextResponse.json({error:"Production job changed; refresh before retrying"},{status:409}); }
+    if(!productionTransitions[job.status]?.includes(next)||job.creative_status!=="approved"||!["confirmed","ready_for_fulfillment"].includes(job.placement_status)) {
+      await client.query("ROLLBACK"); return NextResponse.json({error:"Production requires approved artwork, confirmed terms, and the next valid stage"},{status:422});
+    }
+    const now=new Date().toISOString();
+    await client.query("UPDATE production_jobs SET status=$1,version=version+1,updated_at=$2 WHERE id=$3",[next,now,id]);
+    if(next==="delivered") await client.query("UPDATE installation_work_orders SET status='ready',version=version+1,updated_at=$1 WHERE placement_id=$2 AND work_type='install' AND status='not_ready'",[now,job.placement_id]);
+    if(next==="reprint_required") await client.query("UPDATE installation_work_orders SET status='not_ready',version=version+1,updated_at=$1 WHERE placement_id=$2 AND work_type='install' AND status NOT IN ('installed','cancelled')",[now,job.placement_id]);
+    await client.query("INSERT INTO activity_events (id,organization_id,actor_id,subject_type,subject_id,action,previous_state,next_state,created_at) VALUES ($1,$2,$3,'production_job',$4,'status_changed',$5,$6,$7)",[`EVT-${randomUUID()}`,job.organization_id,user.id,id,job.status,next,now]);
+    await client.query("COMMIT"); return NextResponse.json({id,status:next,version:job.version+1});
+  } catch { await client.query("ROLLBACK").catch(()=>undefined); return NextResponse.json({error:"Production update failed; refresh server state"},{status:500}); }
+  finally { client.release(); }
 }

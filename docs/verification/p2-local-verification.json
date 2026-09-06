@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-05",
+  "scope": "P2 software, local verification",
+  "runtime": {
+    "os": "Windows",
+    "node": "24.19.0",
+    "browser": "Chrome",
+    "database": "isolated local PostgreSQL test schema"
+  },
+  "tests": {
+    "files": 55,
+    "passed": 176,
+    "skipped": 0
+  },
+  "browser": {
+    "flagsOnPassed": 16,
+    "flagsOffPassed": 16,
+    "explicit24HourLeaseScenariosPassed": 2,
+    "wallClock24HourSoak": false
+  },
+  "build": "passed",
+  "typecheck": "passed",
+  "uiAudit": {
+    "errors": 0,
+    "warnings": 0,
+    "unresolved": 0
+  },
+  "verifiedScenarios": [
+    "concurrent confirmation and legacy capacity isolation",
+    "exact-version approval eligibility",
+    "tenant and credential isolation",
+    "idempotent playback and sequence conflict rejection",
+    "atomic event/issue rollback and retry",
+    "mixed image/video rotation with failed asset",
+    "persistent offline media and renderer restart",
+    "outbox synchronization without duplicate IDs",
+    "atomic cache rollback on quota failure",
+    "offline alert expiry and ordinary-content resumption",
+    "lease expiry across reload",
+    "styled offline startup",
+    "French keyboard and reflow"
+  ],
+  "releaseChecks": [
+    "physical 24-hour soak and power/process restart",
+    "managed kiosk storage/autoplay/clock qualification",
+    "native Canadian French review",
+    "deployment migration and rollback rehearsal"
+  ],
+  "knownBaselineLimitation": "Legacy next lint command is incompatible with Next 16",
+  "deployed": false
+}

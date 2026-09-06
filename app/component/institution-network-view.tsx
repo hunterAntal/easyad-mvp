@@ -14,6 +14,7 @@ import { toast } from "./toast";
 import { useExpiringClock } from "./use-expiring-clock";
 import { useI18n } from "../i18n/client";
 import { isDigitalInventory } from "../lib/inventory-delivery";
+import PlayerControl from "./player-control";
 
 export type EmergencyOverrideDraft = {
   alertType: DeviceAlertType;
@@ -185,6 +186,8 @@ export default function InstitutionNetworkView({
           </div>
         </div>
       </div>
+
+      {isDigitalInventory(selected) ? <PlayerControl key={selected.id} inventoryId={selected.id} screenName={selected.name} /> : null}
 
       <div className="panel network-alert-panel">
         <div className="network-alert-copy">

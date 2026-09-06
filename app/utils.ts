@@ -145,7 +145,7 @@ export function reservedLoopSeconds(item: InventoryItem, adSlots: number) {
 }
 
 export function isCapacityReservingStatus(status: Booking["status"]) {
-  return !["completed", "rejected"].includes(status);
+  return ["approved", "scheduled", "live"].includes(status);
 }
 
 export function bookedLoopSeconds(item: InventoryItem, bookings: Booking[], start: string, end: string, excludeId = "") {
@@ -194,9 +194,8 @@ export function expectedImpressions(item: InventoryItem, start: string, end: str
   return Math.round((item.impressions * daysBetween(start, end)) / REFERENCE_FLIGHT_DAYS);
 }
 
-// Delivered impressions are the expected impressions scaled by verified
-// proof-of-play completion, so reporting reflects real delivery rather than a
-// flat assumption.
+// Legacy impression estimates scale inventory assumptions by operator-declared
+// completion. They are not measured views or authenticated player evidence.
 export function deliveredImpressions(item: InventoryItem, booking: { start: string; end: string; pop: number }) {
   return Math.round(expectedImpressions(item, booking.start, booking.end) * (booking.pop / 100));
 }

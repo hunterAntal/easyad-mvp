@@ -89,7 +89,7 @@ export function getInstitutionScope(user: DbUser | null) {
 export function canManageInventoryRecord(user: DbUser | null, inventory: InventoryItem) {
   if (user?.role === "admin") return true;
   const institutionId = getInstitutionScope(user);
-  return Boolean(institutionId && inventory.institutionId === institutionId);
+  return Boolean(institutionId && inventory.institutionId === institutionId && (user?.role!=="operator" || !Array.isArray(user.screenScope) || user.screenScope.includes(inventory.id)));
 }
 
 export function canPublishInventoryRecord(user: DbUser | null, inventory: InventoryItem) {

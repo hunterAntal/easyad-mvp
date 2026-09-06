@@ -14,11 +14,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const booking = await getBooking(id);
   const inventory = booking ? await getInventory(booking.inventoryId) : null;
   if (!booking || !canReadBooking(user, await getBookingOwnerId(id), inventory)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  return NextResponse.json({ logs: await listPopLogs(id) });
+  return NextResponse.json({ logs: (await listPopLogs(id)).map(log=>({...log,provenance:log.source==="demo-delivery-tick"?"demo":"operator_declaration",impressionsLabel:"estimated"})), provenance: "legacy_operator_or_demo", impressionsLabel: "estimated", note: "Historical verified status is an operator declaration, not authenticated player evidence." });
 }
 
-// Player / device check-in: records a verified proof-of-play batch and
-// recomputes the booking's delivery completion.
+// Legacy operator declaration. Counts and derived impressions are not player-measured evidence.
 export async function POST(request: NextRequest, context: RouteContext) {
   const user = await getCurrentUser();
   if (!user || !canManageInventory(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     plays,
     impressions,
     status,
-    source: typeof body.source === "string" && body.source.trim() ? body.source.trim() : "player-checkin",
+    source: "operator-declaration",
     playedAt: new Date().toISOString(),
   });
 

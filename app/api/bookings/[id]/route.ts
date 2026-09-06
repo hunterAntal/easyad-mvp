@@ -1,3 +1,4 @@
+import { ScheduleError } from "../../../lib/digital-schedule";
 import { NextRequest, NextResponse } from "next/server";
 import { canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../lib/auth";
 import { createApprovalEvent, getBooking, getInventory, updateBookingRecord, updatePendingCreativeStatuses } from "../../../lib/db";
@@ -19,10 +20,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!status || !["pending approval", "creative review"].includes(current.status)) {
     return NextResponse.json({ error: "Only pending campaigns can be approved or rejected" }, { status: 400 });
   }
-  const booking = await updateBookingRecord(id, {
+  let booking;
+  try { booking = await updateBookingRecord(id, {
     status,
     creativeStatus: status === "approved" ? "approved" : current.creativeStatus,
-  });
+  }); } catch(error) { if(error instanceof ScheduleError) return NextResponse.json({error:error.message},{status:409}); throw error; }
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
   await updatePendingCreativeStatuses(id, status === "approved" ? "approved" : "needs changes");
   const action = booking.status === "approved" ? "approved" : booking.status === "rejected" ? "rejected" : null;

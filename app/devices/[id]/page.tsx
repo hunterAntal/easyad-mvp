@@ -1,3 +1,4 @@
+import { getActiveDeviceMedia } from "../../lib/public-device-media";
 import { notFound } from "next/navigation";
 import { DeviceMediaSlide } from "../../component/device-media-carousel";
 import DeviceScreen from "../../component/device-screen";
@@ -29,29 +30,8 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
   const city = deriveCity(inventory.address);
   const activeAlert = await getActiveDeviceAlertForDevice(inventory.id);
 
-  const deviceSlides: DeviceMediaSlide[] = (await listMediaResources(id))
-    .filter((resource) => resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video"))
-    .map((resource) => ({
-      id: resource.id,
-      title: resource.title,
-      subtitle: `${t(resource.mediaType)} - ${resource.originalName}`,
-      mediaType: resource.mediaType === "video" ? "video" : "image",
-      publicUrl: resource.publicUrl,
-      createdAt: resource.createdAt,
-    }));
-
-  const advertiserSlides: DeviceMediaSlide[] = (await listInventoryAdvertiserResources(id))
-    .filter((resource) => Boolean(resource.publicUrl))
-    .map((resource) => ({
-      id: resource.id,
-      title: resource.campaign,
-      subtitle: `${t("Advertiser creative")} - ${resource.advertiser} - ${resource.originalName ?? t("uploaded media")}`,
-      mediaType: resource.mimeType?.startsWith("video/") ? "video" : "image",
-      publicUrl: resource.publicUrl ?? "",
-      createdAt: resource.createdAt,
-    }));
-
-  const slides = [...deviceSlides, ...advertiserSlides].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const media=await getActiveDeviceMedia(id);
+  const slides:DeviceMediaSlide[]=(media?.items??[]).map(item=>({id:item.id,title:item.title,subtitle:"",mediaType:item.mediaType,publicUrl:item.publicUrl,createdAt:item.createdAt}));
 
   return (
     <DeviceScreen

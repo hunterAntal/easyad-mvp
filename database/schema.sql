@@ -159,6 +159,47 @@ CREATE TABLE IF NOT EXISTS app_metadata (
   value TEXT NOT NULL
 );
 
+-- Authenticated player control (P1). Inventory/user ownership stays canonical.
+CREATE TABLE IF NOT EXISTS players (
+  id TEXT PRIMARY KEY,
+  inventory_id TEXT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+  institution_id TEXT,
+  credential_hash TEXT NOT NULL UNIQUE,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ,
+  expected_revision INTEGER NOT NULL DEFAULT 0,
+  received_revision INTEGER NOT NULL DEFAULT 0,
+  validated_revision INTEGER NOT NULL DEFAULT 0,
+  applied_revision INTEGER NOT NULL DEFAULT 0,
+  last_seen_at TIMESTAMPTZ,
+  applied_at TIMESTAMPTZ,
+  last_error TEXT,
+  last_error_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_active_inventory ON players(inventory_id) WHERE revoked_at IS NULL;
+CREATE TABLE IF NOT EXISTS player_pairing_codes (
+  inventory_id TEXT PRIMARY KEY REFERENCES inventory(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL UNIQUE,
+  created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS player_manifests (
+  player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL,
+  content_hash TEXT NOT NULL,
+  manifest JSONB NOT NULL,
+  valid_until TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (player_id, revision)
+);
+CREATE TABLE IF NOT EXISTS player_pairing_limits (
+  bucket TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
 -- Phase 1: additive organization and inventory foundations. Legacy users.role,
 -- inventory.format/x/y, and institution ownership remain compatibility inputs.
 CREATE TABLE IF NOT EXISTS organizations (
@@ -327,6 +368,20 @@ CREATE TABLE IF NOT EXISTS placement_issues (
   id TEXT PRIMARY KEY, placement_id TEXT NOT NULL REFERENCES placements(id) ON DELETE CASCADE,
   issue_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', detail TEXT, created_at TEXT NOT NULL, resolved_at TEXT
 );
+ALTER TABLE placements ADD COLUMN IF NOT EXISTS schedule_snapshot JSONB;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS schedule_snapshot JSONB;
+ALTER TABLE digital_delivery_events ALTER COLUMN placement_id DROP NOT NULL;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'legacy_ingest';
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS manifest_revision INTEGER;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS session_id TEXT;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS sequence BIGINT;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS request_hash TEXT;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS late BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_player_sequence ON digital_delivery_events(player_id,session_id,sequence) WHERE provenance='authenticated_player';
+CREATE INDEX IF NOT EXISTS idx_delivery_last_play ON digital_delivery_events(player_id,occurred_at DESC) WHERE provenance='authenticated_player' AND event_type='delivered';
+ALTER TABLE placement_issues ADD COLUMN IF NOT EXISTS delivery_event_id TEXT REFERENCES digital_delivery_events(id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_issue_delivery_event ON placement_issues(delivery_event_id) WHERE delivery_event_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS activity_events (
   id TEXT PRIMARY KEY, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   actor_id TEXT REFERENCES users(id) ON DELETE SET NULL, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL,
@@ -428,3 +483,45 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_queue ON installation_work_orders(sta
 CREATE INDEX IF NOT EXISTS idx_work_order_evidence_order ON work_order_evidence(work_order_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_activity_subject ON activity_events(subject_type, subject_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at, created_at DESC);
+
+-- P4: additive fleet controls. Legacy content stays public; marketplace participation is explicit.
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS building TEXT NOT NULL DEFAULT '';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT '';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS content_visibility TEXT NOT NULL DEFAULT 'public';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS advertising_opt_in BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS restricted_categories JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS reserved_seconds INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS fleet_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS screen_scope JSONB;
+ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS starts_at TEXT;
+ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS ends_at TEXT;
+ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS content_category TEXT NOT NULL DEFAULT 'general';
+CREATE TABLE IF NOT EXISTS fleet_audit (
+ id TEXT PRIMARY KEY, actor_id TEXT, institution_id TEXT, target_id TEXT NOT NULL,
+ action TEXT NOT NULL, revision INTEGER, priority TEXT NOT NULL DEFAULT 'ordinary',
+ result TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS fleet_audit_scope ON fleet_audit(institution_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS fleet_announcements (
+ id TEXT PRIMARY KEY, institution_id TEXT NOT NULL REFERENCES users(id), name TEXT NOT NULL,
+ media_id TEXT NOT NULL REFERENCES media_resources(id) ON DELETE CASCADE, created_by TEXT NOT NULL REFERENCES users(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS player_alert_state (
+ player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+ alert_id TEXT NOT NULL REFERENCES device_alerts(id) ON DELETE CASCADE,
+ received_at TIMESTAMPTZ, applied_at TIMESTAMPTZ, rendered_at TIMESTAMPTZ, restored_at TIMESTAMPTZ,
+ revision INTEGER NOT NULL, PRIMARY KEY(player_id,alert_id)
+);
+-- Non-institution inventory preserves marketplace compatibility. Run this migration only once.
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM app_metadata WHERE key='p4_advertising_defaults') THEN
+  UPDATE inventory SET advertising_opt_in=TRUE WHERE institution_id IS NULL;
+  INSERT INTO app_metadata(key,value) VALUES('p4_advertising_defaults','1');
+ END IF;
+END $$;
+ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS target_scope JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS resource_id TEXT;
+ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ NOT NULL DEFAULT (NOW()+INTERVAL '7 years');
+ALTER TABLE player_alert_state ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ NOT NULL DEFAULT (NOW()+INTERVAL '90 days');

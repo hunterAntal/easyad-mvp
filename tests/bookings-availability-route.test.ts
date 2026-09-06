@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getInventory: vi.fn(),
   listBookings: vi.fn(async () => []),
   storeMedia: vi.fn(async () => "/tmp/booking-creative.png"),
-  deleteStoredMedia: vi.fn(async () => undefined),
+  deleteStoredMedia: vi.fn(async (_storagePath: string) => undefined),
 }));
 
 vi.mock("../app/lib/auth", () => ({

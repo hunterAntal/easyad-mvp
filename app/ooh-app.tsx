@@ -12,6 +12,7 @@ import DiscoverView from "./component/discover-view";
 import { ApprovalsView, CalendarView, InventoryView } from "./component/operator-views";
 import AccountManagementView from "./component/account-management-view";
 import InstitutionTeamView from "./component/institution-team-view";
+import FleetOperations from "./component/fleet-operations";
 import InstitutionNetworkView, { type EmergencyOverrideDraft } from "./component/institution-network-view";
 import Portal from "./component/portal";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
@@ -617,6 +618,7 @@ export default function OohApp({
       <main className="workspace">
         <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} surface={surface} />
         {renderDashboardView()}
+        {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
     </div>
   );

@@ -10,6 +10,7 @@ import { FixedLocaleProvider, useI18n } from "../i18n/client";
 import type { Locale } from "../i18n/config";
 
 type DeviceScreenProps = {
+  mediaContent?: React.ReactNode;
   inventoryName: string;
   city: string;
   imageInterval: number;
@@ -34,12 +35,13 @@ function DeviceScreenContent({
   preview = false,
   displayLanguage,
   activeAlert,
+  mediaContent,
 }: DeviceScreenProps) {
   const { t } = useI18n();
   const stopName = `${city} - ${inventoryName}`;
   const media = (
     <div className="device-region media">
-      <DeviceMediaCarousel inventoryName={inventoryName} imageInterval={imageInterval} slides={slides} interactive={preview} />
+      {mediaContent ?? <DeviceMediaCarousel inventoryName={inventoryName} imageInterval={imageInterval} slides={slides} interactive={preview} />}
     </div>
   );
 

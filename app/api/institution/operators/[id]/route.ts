@@ -1,3 +1,4 @@
+import {fleetEnabled,revokeOperator} from "../../../../lib/fleet";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../../../lib/auth";
 import { deleteManagedUser, getUserById } from "../../../../lib/db";
@@ -12,6 +13,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (!operator || operator.role !== "operator" || operator.institutionId !== institution.id) {
     return NextResponse.json({ error: "Operator not found in this institution" }, { status: 404 });
   }
-  await deleteManagedUser(id);
+  if(fleetEnabled())await revokeOperator(institution,id);else await deleteManagedUser(id);
   return NextResponse.json({ ok: true });
 }

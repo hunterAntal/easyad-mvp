@@ -10,6 +10,8 @@ import InstitutionNetworkView from "../app/component/institution-network-view";
 vi.mock("../app/component/maplibre-inventory-map", () => ({
   default: () => <div data-testid="institution-fleet-map">Fleet map</div>,
 }));
+// Player connection behavior has its own API/component coverage.
+vi.mock("../app/component/player-control", () => ({ default: () => null }));
 
 const published: InventoryItem = {
   id: "INV-CIVIC-1",
