@@ -1,0 +1,97 @@
+name: Verify and deploy EasyAD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: easyad-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ooh_app
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ooh_market_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ooh_app -d ooh_market_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://ooh_app:ci_password@localhost:5432/ooh_market_test
+      DATABASE_URL: postgres://ooh_app:ci_password@localhost:5432/ooh_market_test
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx tsc --noEmit
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RESOURCE_GROUP: biblia-llm-rg
+      APP_NAME: easyad-web
+      REGISTRY: bibliaprod2acrsnan4juouezei
+      IMAGE: bibliaprod2acrsnan4juouezei.azurecr.io/easyad-web:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in with main-branch OIDC identity
+        uses: azure/login@v2
+        with:
+          client-id: 70d0096d-b04e-41bb-92ef-a4170b4a999a
+          tenant-id: e984fc74-9121-4abf-a2d2-3805da9a18b0
+          subscription-id: cc014e27-71e1-4ca7-9c8b-db78c15f365e
+      - name: Build and push immutable image
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name "$REGISTRY"
+          docker build --tag "$IMAGE" .
+          docker push "$IMAGE"
+      - name: Update EasyAD and verify rollout
+        shell: bash
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade --yes
+          mode=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.configuration.activeRevisionsMode -o tsv)
+          test "$mode" = Single || { echo 'Expected Single revision mode; review traffic configuration.' >&2; exit 1; }
+          revision=$(az containerapp update -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+            --container-name "$APP_NAME" --image "$IMAGE" \
+            --revision-suffix "gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --query properties.latestRevisionName -o tsv)
+          test -n "$revision"
+          ready=false
+          for attempt in $(seq 1 60); do
+            healthy=$(az containerapp revision show -g "$RESOURCE_GROUP" -n "$APP_NAME" --revision "$revision" --query properties.healthState -o tsv)
+            latest=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.latestReadyRevisionName -o tsv)
+            if [ "$healthy" = Healthy ] && [ "$latest" = "$revision" ]; then ready=true; break; fi
+            sleep 10
+          done
+          test "$ready" = true || { echo "Revision $revision did not become ready." >&2; exit 1; }
+          fqdn=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.configuration.ingress.fqdn -o tsv)
+          curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 10 --max-time 30 "https://$fqdn/api/health"
+          printf 'Deployed `%s` to https://%s\n' "$IMAGE" "$fqdn" >> "$GITHUB_STEP_SUMMARY"

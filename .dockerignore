@@ -9,6 +9,8 @@ test-results
 playwright-report
 coverage
 TEMP_ACCOUNTS.txt
+*.pem
+*.key
 *.log
 Dockerfile*
 README.md
