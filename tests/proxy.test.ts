@@ -1,7 +1,25 @@
 import * as assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import { proxy } from "../proxy";
+
+test("production CSP permits map data while restricting other external connections", () => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    const response = proxy(new NextRequest("https://easyad.example/"));
+    const policy = response.headers.get("Content-Security-Policy");
+    assert.ok(policy);
+    const connect = policy.split(";").map((directive) => directive.trim()).find((directive) => directive.startsWith("connect-src "));
+    assert.deepEqual(connect?.split(/\s+/).slice(1), [
+      "'self'",
+      "https://tile.openstreetmap.org",
+      "https://tiles.openfreemap.org",
+    ]);
+    assert.ok(policy.includes("worker-src 'self' blob:"));
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 
 test("proxy rejects cross-origin API mutations and permits same-origin requests", () => {
   const blocked = proxy(new NextRequest("http://localhost:3000/api/bookings", {
