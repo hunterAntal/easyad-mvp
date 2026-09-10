@@ -31,6 +31,22 @@ npm run dev
 
 `npm run init` installs dependencies, copies `.env.example` to `.env.local` when needed, starts the bundled PostgreSQL service with Docker Compose, and waits until the configured databases are reachable.
 
+### Docker credential helper on macOS
+
+The `docker compose` command needs the Docker Desktop credential helper. Homebrew installs the `docker` binary in a different directory. The helper `docker-credential-desktop` stays in the Docker Desktop application directory.
+
+Add the helper directory to your `PATH` before you run `npm run init`:
+
+```bash
+export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+```
+
+If the `PATH` does not contain this directory, the image pull fails with this error:
+
+```text
+error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH
+```
+
 Seed the documented governmental, institutional, advertiser, and device fixtures for local development:
 
 ```bash
@@ -39,10 +55,34 @@ npm run seed:demo-data
 
 The stable identities, demo credentials, ownership graph, and AI fixture rules are documented in [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md). The older `seed:test-data` command remains available for the temporary test-account workflow.
 
+### Local demo credentials file
+
+The `npm run seed:demo-data` command reads the local file `DEMO_ACCOUNTS.md`. The repository does not contain this file. The `.gitignore` file excludes it. Never commit this file and never upload it.
+
+Create the file in the repository root before you run the seed command. Use a Markdown table with four columns. Put the stable user ID in the first column. Put the email in the third column. Put the password in the fourth column.
+
+```markdown
+| Stable user ID | Name | Email | Password |
+|---|---|---|---|
+| `USR-DEMO-GOV-TB` | City of Thunder Bay Screen Operations | `gov.thunderbay@demo.local` | `<password>` |
+```
+
+The table needs one row for each of the eight demo users. [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md) lists the eight stable user IDs. The seed command stops with an error if a row is missing.
+
 The local compose setup creates:
 
 - `ooh_market` for the app
 - `ooh_market_test` for integration tests
+
+### Application origin and port
+
+The `npm run dev` command uses port 3000. Another application can hold port 3000. Start the server on a different port in this condition:
+
+```bash
+npx next dev -p 3001
+```
+
+Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
 
 Run the PostgreSQL integration test with:
 
