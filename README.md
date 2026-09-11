@@ -151,6 +151,8 @@ Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) w
 
 A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.
 
+Complexity varies inside the advertiser role as well as between roles. Advertiser density is disclosed progressively, and the interface remembers what a person opens instead of asking them to pick a level. Any mode has two settings, defaults to guided, and never applies to the operator, institution, or government consoles. [ADR 0008](docs/adr/0008-advertiser-complexity-modes.md) records that decision and its boundary.
+
 ## Production Notes
 
 The production target is a stateless Next.js container on ECS Fargate, RDS PostgreSQL, and private S3 media storage. See [the AWS deployment runbook](docs/AWS_DEPLOYMENT.md) for the complete build, IAM, migration, health-check, and release procedure.
