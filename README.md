@@ -149,6 +149,8 @@ Role selects the vocabulary. No screen is forked. `advertiserViewTitles` and `ad
 
 Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
 
+Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
+
 Every empty state names a next action, through the shared `EmptyState` in [`app/component/shared-ui.tsx`](app/component/shared-ui.tsx). A column header is never shown above an empty table.
 
 A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.

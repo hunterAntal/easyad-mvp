@@ -37,7 +37,7 @@ export default function DiscoverView(props: {
   return (
     <section className="grid discover-grid">
       <div className="panel filters-panel">
-        <PanelHeading eyebrow="Spatial filters" title="Discovery" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
+        <PanelHeading eyebrow="Filters" title="Narrow your search" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
         <FiltersPanel {...props} />
       </div>
       <div className="map-stage">
@@ -86,7 +86,10 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
         <span>{t("{amount}/day", { amount: money(item.price, locale) })}</span>
       </div>
       {isStaticInventory(item) ? <span className={`status ${availability === "Available" ? "good" : "bad"}`}>{t(availability)}</span> : null}
-      {item.tags?.length ? <div className="device-tag-list">{item.tags.slice(0, 4).map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      {/* Four tag chips on each of eight cards is 32 chips in a scanning list,
+          and the format tag repeats the format line directly above it. The
+          list carries what you scan by; the detail panel below still lists
+          every tag for the selected screen. */}
       <Meter value={item.occupancy} />
       <div className="card-stats">
         <span>{t("{count} impressions", { count: formatNumber(item.impressions) })}</span>

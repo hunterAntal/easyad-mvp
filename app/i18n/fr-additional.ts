@@ -1,4 +1,7 @@
 export const frAdditional: Record<string, string> = {
+  "Filters": "Filtres",
+  "Narrow your search": "Affinez votre recherche",
+  "More filters": "Plus de filtres",
   "No bookings to show": "Aucune réservation à afficher",
   "Bookings appear here once a screen is reserved.": "Les réservations apparaissent ici dès qu’un écran est réservé.",
   "No delivery to report yet": "Aucune diffusion à signaler",

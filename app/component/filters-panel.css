@@ -185,3 +185,52 @@
   padding-top: 12px;
 }
 }
+
+/* ADR 0008 stage 1. Three filters answer "where" and "how much"; the rest sit
+   behind this control and the choice is remembered. The count makes an active
+   hidden filter visible, so disclosure never hides capability. */
+.filter-disclosure {
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: .85rem;
+  font-weight: 600;
+  display: flex;
+}
+
+.filter-disclosure:hover {
+  border-color: var(--green);
+}
+
+.filter-disclosure-count {
+  background: var(--soft-green);
+  color: var(--green-dark);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: .74rem;
+  font-weight: 700;
+}
+
+.filter-disclosure-chevron {
+  color: var(--muted);
+  margin-left: auto;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.filter-advanced {
+  gap: 14px;
+  display: grid;
+}
+
+/* A class rule with display beats the user-agent [hidden] rule, so the group
+   stayed laid out at full height while marked hidden. */
+.filter-advanced[hidden] {
+  display: none;
+}
