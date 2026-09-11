@@ -3,7 +3,7 @@
 import "./reports-billing-views.css";
 import { Booking, InventoryItem, Transaction } from "../data";
 import { deliveredImpressions, money, number, splitRevenue } from "../utils";
-import { BookingsTable, Metric, PanelHeading } from "./shared-ui";
+import { BookingsTable, EmptyState, Metric, PanelHeading } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 
@@ -28,6 +28,16 @@ export function ReportsView({
   const popRate = Math.round(bookings.reduce((sum, booking) => sum + booking.pop, 0) / Math.max(1, bookings.length));
   const collected = transactions.filter((transaction) => transaction.status === "paid").reduce((sum, transaction) => sum + transaction.amount, 0);
   const cpm = totalImpressions > 0 ? Math.round((bookings.reduce((sum, booking) => sum + booking.spend, 0) / totalImpressions) * 1000) : 0;
+  const chartRows = Object.values(bookings.reduce<Record<string, { id: string; name: string; impressions: number }>>((rows, booking) => {
+    const item = inventory.find((unit) => unit.id === booking.inventoryId);
+    if (!item) return rows;
+    const delivered = deliveredImpressions(item, booking);
+    const row = rows[item.id] ?? { id: item.id, name: item.name, impressions: 0 };
+    row.impressions += delivered;
+    rows[item.id] = row;
+    return rows;
+  }, {})).sort((a, b) => b.impressions - a.impressions).slice(0, 6);
+  const chartPeak = chartRows.reduce((peak, row) => Math.max(peak, row.impressions), 0);
   return (
     <section className="grid reports-grid">
       <div className="panel span-2">
@@ -38,8 +48,21 @@ export function ReportsView({
           <Metric label="Active campaigns" value={bookings.filter((booking) => ["scheduled", "live"].includes(booking.status)).length} />
           <Metric label="Verified CPM" value={money(cpm, locale)} />
         </div>
-        <div className="bar-chart">{inventory.slice(0, 6).map((item) => <div key={item.id}><span>{item.id}</span><i style={{ height: Math.max(12, item.impressions / 2200) }} /><small>{formatNumber(item.impressions)}</small></div>)}</div>
+        {/* This chart used to plot inventory.impressions, which is the screen's
+            own audience figure for screens this account may never have booked.
+            Under a "Performance overview" heading that reads as delivered
+            results. It now plots what these bookings actually delivered. */}
+        {chartRows.length ? (
+          <div className="bar-chart">{chartRows.map((row) => <div key={row.id}><span title={row.name}>{row.name}</span><i style={{ height: Math.max(12, row.impressions / Math.max(1, chartPeak) * 150) }} /><small>{formatNumber(row.impressions)}</small></div>)}</div>
+        ) : (
+          <EmptyState
+            title="No delivery to report yet"
+            copy="Once a screen owner approves your ad and it starts running, what it delivered appears here."
+            action={<a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a>}
+          />
+        )}
       </div>
+      {canRunDelivery ? (
       <div className="panel">
         <PanelHeading
           eyebrow="PoP logging"
@@ -48,6 +71,7 @@ export function ReportsView({
         />
         <div className="pop-list">{bookings.map((booking) => <div key={booking.id}><strong>{booking.id}</strong><span>{booking.campaign}</span><meter min={0} max={100} value={booking.pop} /><small>{t("{percent}% verified - {amount} collected platform-wide", { percent: booking.pop, amount: money(collected, locale) })}</small></div>)}</div>
       </div>
+      ) : null}
       <div className="panel span-2"><PanelHeading eyebrow="Campaigns" title="Reporting table" /><BookingsTable bookings={bookings} inventory={inventory} /></div>
     </section>
   );

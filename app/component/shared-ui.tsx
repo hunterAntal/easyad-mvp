@@ -33,6 +33,20 @@ export function NavLinkButton({
   );
 }
 
+// The existing .empty-state markup, with the part that was missing everywhere:
+// a way out. An empty screen that only states a rule leaves a person stuck, so
+// every empty state names the next action.
+export function EmptyState({ title, copy, action }: { title: string; copy: string; action?: React.ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <div className={`empty-state${action ? " has-action" : ""}`}>
+      <strong>{t(title)}</strong>
+      <span>{t(copy)}</span>
+      {action ? <div className="empty-state-action">{action}</div> : null}
+    </div>
+  );
+}
+
 export function Metric({ label, value }: { label: string; value: string | number }) {
   const { t } = useI18n();
   return <div className="metric"><span>{t(label)}</span><strong>{value}</strong></div>;
@@ -61,7 +75,9 @@ export function BookingsTable({ bookings, inventory }: { bookings: Booking[]; in
   const { locale, t } = useI18n();
   return (
     <div className="inventory-table">
-      <div className="table-head"><span>{t("Campaign")}</span><span>{t("Inventory")}</span><span>{t("Dates")}</span><span>{t("Status")}</span><span>{t("Creative")}</span><span>{t("Spend")}</span></div>
+      {/* A column header above an empty table labels nothing, and it reads as a
+          table that failed to load. It appears only once there is a row. */}
+      {bookings.length ? <div className="table-head"><span>{t("Campaign")}</span><span>{t("Inventory")}</span><span>{t("Dates")}</span><span>{t("Status")}</span><span>{t("Creative")}</span><span>{t("Spend")}</span></div> : <EmptyState title="No bookings to show" copy="Bookings appear here once a screen is reserved." />}
       {bookings.map((booking) => {
         const item = inventory.find((unit) => unit.id === booking.inventoryId);
         return <div className="table-row" key={booking.id}><span><strong>{booking.campaign}</strong><small>{booking.advertiser} - {t(booking.adSlots === 1 ? "{count} slot" : "{count} slots", { count: booking.adSlots })}</small></span><span>{item?.name ?? booking.inventoryId}</span><span>{booking.start}<small>{booking.end}</small></span><span><span className="status">{t(booking.status)}</span></span><span>{t(booking.creativeStatus)}</span><span>{money(booking.spend, locale)}</span></div>;

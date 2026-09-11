@@ -149,6 +149,8 @@ Role selects the vocabulary. No screen is forked. `advertiserViewTitles` and `ad
 
 Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
 
+Every empty state names a next action, through the shared `EmptyState` in [`app/component/shared-ui.tsx`](app/component/shared-ui.tsx). A column header is never shown above an empty table.
+
 A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.
 
 The portal at `/` serves two audiences from one component. A signed-out visitor sees the marketing page. A signed-in advertiser sees a task-focused home built by `AdvertiserHome` in [`app/component/portal.tsx`](app/component/portal.tsx). Role selects the branch; the screen is not forked. The civic gateway renders for both, because a test and [DESIGN.md](DESIGN.md) require it at the end of the page for every visitor.

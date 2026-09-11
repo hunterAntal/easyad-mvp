@@ -5,7 +5,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";
 import { capitalize, creativeHref, isCreativeSubmissionAllowed, templateHeadline, templateTitle, validateCreative } from "../utils";
-import { BookingsTable, PanelHeading, Range } from "./shared-ui";
+import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 
@@ -57,11 +57,12 @@ export default function CreativeView({
   if (!selectedBooking) {
     return (
       <section className="panel">
-        <PanelHeading eyebrow="Creative queue" title="No eligible campaigns" />
-        <div className="empty-state">
-          <strong>{t("No eligible campaign spaces available.")}</strong>
-          <span>{t("Creative can be submitted only while a campaign is pending approval or approved and has not expired.")}</span>
-        </div>
+        <PanelHeading eyebrow="Your ad" title="Book a screen first" />
+        <EmptyState
+          title="You need a booking before you can add an ad"
+          copy="Pick a screen and your dates first. Your ad picture is attached to that booking, and the screen owner checks it before it goes live."
+          action={<a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a>}
+        />
       </section>
     );
   }
