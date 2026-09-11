@@ -1,4 +1,5 @@
 export const frAdditional: Record<string, string> = {
+  "See everything about this screen": "Voir tous les détails de cet écran",
   "What you owe": "Ce que vous devez",
   "Your total": "Votre total",
   "Still to pay": "Reste à payer",

@@ -6,14 +6,11 @@
   display: grid;
 }
 
-.discover-grid {
-  grid-template-columns: 280px minmax(380px,1fr) 330px;
-  grid-template-areas: "filters map list""filters detail detail";
-}
-
 .detail-panel {
   grid-area: detail;
 }
+
+
 
 .inventory-list {
   gap: 10px;
@@ -121,8 +118,9 @@
 @media (max-width:1180px) {
 
 .discover-grid {
-  grid-template-columns: 280px minmax(0,1fr);
-  grid-template-areas: "filters map""list list""detail detail";
+  grid-template-columns: 300px minmax(0,1fr);
+  grid-template-areas: "filters map""detail map""list list";
+  grid-template-rows: auto auto auto;
 }
 }
 
@@ -170,9 +168,18 @@
   border-color: #c5cdc8;
 }
 
+/* The canonical Discover grid. A second .discover-grid block sits higher in
+   this file; this one wins on source order, so the layout is defined here.
+
+   The detail panel used to occupy a second row spanning map and list, which
+   put the thing a buyer most needs after clicking a screen below the fold at
+   roughly y=774. Now that seven filters moved behind disclosure the left
+   column has room to spare, so the detail sits under the filters and the map
+   and list grow through both rows. */
 .discover-grid {
-  grid-template-columns: 272px minmax(480px,1fr) 326px;
-  grid-template-areas: "filters map list""filters detail detail";
+  grid-template-columns: 300px minmax(480px,1fr) 326px;
+  grid-template-areas: "filters map list""detail map list";
+  grid-template-rows: auto minmax(0,1fr);
   gap: 12px;
 }
 
@@ -309,4 +316,22 @@
   grid-template-columns: 1fr;
 }
 }
+}
+
+/* The detail panel now lives in the 300px left column, so its metric tiles wrap
+   to two per row. Declared last and scoped through .discover-grid so it beats
+   the wider repeat(3) and repeat(4) rules earlier in this file. */
+.discover-grid .detail-panel .detail-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+.detail-profile-link {
+  color: var(--green-dark);
+  font-size: .85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detail-profile-link:hover {
+  text-decoration: underline;
 }

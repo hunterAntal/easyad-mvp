@@ -112,12 +112,13 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
         <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />
         <Metric label="Impressions" value={formatNumber(item.impressions)} />
         <Metric label="Traffic" value={formatNumber(item.traffic)} />
-        <Metric label="Income index" value={money(item.income, locale)} />
-        <Metric label="Audience" value={t(item.audience)} />
-        <Metric label="Competitors" value={t(item.competitor)} />
-        <Metric label="Nearby businesses" value={businesses.filter((business) => mapDistanceKm(item, business) < 13).length} />
         {isStaticInventory(item) ? <Metric label="Status" value={t(availability)} /> : null}
       </div>
+      {/* Income index, audience, competitor presence and nearby-business counts
+          are planning figures for a media buyer, not the four numbers a person
+          decides a booking on. The full profile still carries every one of
+          them, so this defers detail without removing capability. */}
+      <a className="detail-profile-link" href={`/inventory/${item.id}`}>{t("See everything about this screen")}</a>
       <div className="spec-box">
         <strong>{t("Creative spec")}</strong>
         <span>{t(spec.spec)}</span>

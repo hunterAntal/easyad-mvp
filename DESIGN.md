@@ -143,7 +143,9 @@ Public surfaces use 9–12px radii. Dense workspace controls use 6px and panels 
 
 ### Foundational visual states
 
-Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Every state includes a distinct icon shape and a text label; colour alone never encodes a state. A scanning list carries only what a person scans by. Per-item attributes belong in the detail surface for the selected item, not repeated on every row.
+Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Every state includes a distinct icon shape and a text label; colour alone never encodes a state. A browse surface carries the figures a person decides on. Deeper attributes belong on the item's own profile, reachable by a link, so detail is deferred without capability being removed.
+
+A scanning list carries only what a person scans by. Per-item attributes belong in the detail surface for the selected item, not repeated on every row.
 
 An empty state names the next action. A screen that states only a rule leaves a person stuck, so the shared `EmptyState` carries a title, a plain-language explanation, and a control that takes the person to the step that fills it. A column header never renders above an empty table; it appears with the first row.
 
