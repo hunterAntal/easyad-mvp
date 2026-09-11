@@ -70,7 +70,7 @@
 
 .nav button.active .nav-dot,
 .nav a.active .nav-dot {
-  background: var(--gold);
+  background: var(--state-warning-ink);
 }
 
 .tenant-card {

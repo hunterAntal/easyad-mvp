@@ -8,11 +8,24 @@ colors:
   ink: "#131B24"
   muted: "#5B6770"
   line: "#E4E8EA"
+  line-strong: "#767F86"
   primary: "#1F7A5A"
   primary-dark: "#14503C"
   info: "#2F5F9F"
-  warning: "#C18A28"
-  danger: "#B84F3F"
+  info-dark: "#1F497A"
+  state-idle-surface: "#EEF1F3"
+  state-idle-ink: "#5B6770"
+  state-success-surface: "#E3F2EA"
+  state-success-ink: "#14503C"
+  state-warning-surface: "#FBEAB4"
+  state-warning-ink: "#7A5510"
+  state-danger: "#B3192E"
+  state-danger-surface: "#FBE9EC"
+  state-danger-ink: "#A11228"
+  state-info-surface: "#E8EEF6"
+  state-info-ink: "#1F497A"
+  state-emergency-surface: "#1A1206"
+  state-emergency-ink: "#FFC845"
   navigation: "#111B22"
 typography:
   sans:
@@ -85,9 +98,25 @@ The product should feel like a well-run municipal operations room crossed with a
 
 ## Colors
 
-`primary` and `primary-dark` identify safe primary actions, selection, and focus. `info` supports maps and neutral system information. `warning` is reserved for caution and emergency-preparation states; `danger` is reserved for destructive or active high-impact states. `navigation` anchors the persistent operations shell. Emergency screens may use a high-contrast amber/black composition, but routine cards must not borrow that urgency.
+`primary` and `primary-dark` identify safe primary actions, selection, and focus. `info` supports maps and neutral system information. `navigation` anchors the persistent operations shell.
 
-The application is light-theme only today. Focus, text, and controls target WCAG 2.2 AA. Forced-colors mode must retain system-operable outlines and scrollbars.
+Status is encoded by visual weight, not by hue. A colour-vision deficiency removes a hue channel, but it never removes lightness. Each state is therefore a surface-and-ink pair on a severity ladder, and each step is heavier than the step before it.
+
+| Weight | State | Surface | Ink | Contrast |
+|---|---|---|---|---|
+| 0 | Idle, unpublished | `#EEF1F3` | `#5B6770` | 5.12:1 |
+| 1 | Published, healthy | `#E3F2EA` | `#14503C` | 8.10:1 |
+| 2 | Reversible caution | `#FBEAB4` | `#7A5510` | 5.59:1 |
+| 3 | Destructive or failed | `#B3192E` | `#FFFFFF` | 6.78:1 |
+| 4 | Active screen override | `#1A1206` | `#FFC845` | 12.00:1 |
+
+Weight 4 is reserved. Use it for an active screen override only. A routine card must never borrow that urgency.
+
+**Colour alone never encodes a state.** Four pale surfaces measure 1.00:1 apart under deuteranopia, so no palette separates them. Every state must also carry a distinct icon shape and a text label. This rule covers the healthy state, not only the warning and error states.
+
+`line` is a decorative hairline at 1.23:1. It must never bound a control. Use `line-strong` for the edge of an input or a control, because it meets the 3:1 that WCAG 2.2 SC 1.4.11 requires.
+
+The application is light-theme only today. Focus, text, and controls target WCAG 2.2 AA. Forced-colors mode must retain system-operable outlines and scrollbars. The measured basis for these tokens is in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
 
 ## Typography
 
@@ -109,11 +138,11 @@ Public surfaces use 9–12px radii. Dense workspace controls use 6px and panels 
 
 ### Foundational visual states
 
-Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Warning and error states include text, not color alone.
+Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Every state includes a distinct icon shape and a text label; colour alone never encodes a state.
 
 ### Buttons and actions
 
-Primary green is for the main safe action. Neutral dark/outline buttons handle secondary work. Warning amber identifies reversible caution. Danger red is reserved for destructive or high-impact final confirmation. Busy labels retain control dimensions and block duplicate activation.
+Primary green is for the main safe action. Neutral dark/outline buttons handle secondary work. The weight-2 amber pair identifies reversible caution. The weight-3 solid `state-danger` fill is reserved for destructive or high-impact final confirmation; its solid fill is what separates it from a routine action for a colour-blind operator. Busy labels retain control dimensions and block duplicate activation.
 
 ### Navigation and data display
 

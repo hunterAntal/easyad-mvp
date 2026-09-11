@@ -131,6 +131,16 @@ Authorized institutional staff can create time-limited AMBER, evacuation, or pub
 
 Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.
 
+## Colour and Status Encoding
+
+The design system encodes status by visual weight, not by hue. A colour-vision deficiency removes a hue channel, but it never removes lightness. Each state is a surface-and-ink pair on a five-step severity ladder, and weight 4 is reserved for an active screen override.
+
+Colour alone never encodes a state. Every state also carries a distinct icon shape and a text label.
+
+Use `--line-strong` for the edge of a control. Use `--line` for a decorative hairline only, because it gives 1.23:1 and WCAG 2.2 SC 1.4.11 needs 3:1.
+
+The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. [DESIGN.md](DESIGN.md) mirrors them. The measured basis, the rejected alternatives, and the AODA obligation are in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
+
 ## Production Notes
 
 The production target is a stateless Next.js container on ECS Fargate, RDS PostgreSQL, and private S3 media storage. See [the AWS deployment runbook](docs/AWS_DEPLOYMENT.md) for the complete build, IAM, migration, health-check, and release procedure.

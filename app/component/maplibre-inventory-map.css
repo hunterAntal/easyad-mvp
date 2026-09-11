@@ -270,7 +270,7 @@
 }
 
 .maplibre-business {
-  background: var(--gold);
+  background: var(--state-warning-ink);
   border-radius: 4px;
   width: 14px;
   height: 14px;
@@ -380,7 +380,7 @@
 }
 
 .fallback-business {
-  background: var(--gold);
+  background: var(--state-warning-ink);
   border: 2px solid #fff;
   border-radius: 4px;
   width: 14px;
@@ -488,7 +488,7 @@
 .legend-device.selected { background: var(--workspace-green); box-shadow: 0 0 0 2px var(--soft-green); }
 .legend-city { background: var(--workspace-green); }
 .legend-square {
-  background: var(--gold);
+  background: var(--state-warning-ink);
 }
 
 .legend-square {
