@@ -36,6 +36,10 @@ export default function Portal({
   const operatorNames = Array.from(new Set(inventory.map((item) => item.operator)));
   const operators = operatorNames.length;
   const canAccessRole = (targetRole: Role) => Boolean(currentUser && (currentUser.role === "admin" || currentUser.role === targetRole));
+  // A signed-out visitor still needs the marketing page, so the sections below
+  // stay exactly as they were. A signed-in advertiser has already bought the
+  // pitch and needs their next task instead, so they get a different main.
+  const isAdvertiserHome = currentUser?.role === "advertiser";
 
   return (
     <div className="portal">
@@ -58,6 +62,17 @@ export default function Portal({
         </div>
       </header>
       <main>
+        {isAdvertiserHome ? (
+          <AdvertiserHome
+            availableInventory={availableInventory}
+            bookings={bookings}
+            currentUser={currentUser}
+            filters={filters}
+            launch={launch}
+            selectedLocation={selectedLocation}
+          />
+        ) : (
+        <>
         <section className="portal-hero">
           <div className="portal-copy">
             <p className="eyebrow pill"><span className="pill-dot" />{t("OOH planning, booking, creative, and proof-of-play")}</p>
@@ -151,6 +166,11 @@ export default function Portal({
             ))}
           </div>
         </section>
+        </>
+        )}
+        {/* The civic gateway is the marketplace's only advertisement of the
+            institution product, and DESIGN.md requires it at the end of the page
+            for every visitor. It therefore sits outside the role branch above. */}
         <section className="portal-institution-gateway" aria-labelledby="institution-gateway-title">
           <div className="institution-gateway-copy">
             <span className="eyebrow">{t("Government, institutions, and large networks")}</span>
@@ -165,6 +185,123 @@ export default function Portal({
       </main>
     </div>
   );
+}
+
+// The signed-in advertiser home. It answers "what do I do now", not "what is
+// this product". Everything here composes from components that already exist.
+function AdvertiserHome({
+  availableInventory,
+  bookings,
+  currentUser,
+  filters,
+  launch,
+  selectedLocation,
+}: {
+  availableInventory: InventoryItem[];
+  bookings: Booking[];
+  currentUser?: DbUser | null;
+  filters: Filters;
+  launch: (role: Role, view: View) => void;
+  selectedLocation: { x: number; y: number };
+}) {
+  const { locale, t } = useI18n();
+  const spend = bookings.reduce((sum, booking) => sum + booking.spend, 0);
+  const live = bookings.filter((booking) => booking.status === "live" || booking.status === "scheduled").length;
+  const waiting = bookings.filter((booking) => booking.status === "pending approval" || booking.status === "creative review").length;
+  const recent = bookings.slice(0, 3);
+  const steps: Array<[string, string, View]> = [
+    ["Find screens near you", "Search a map of screens around your shop and compare what they cost.", "discover"],
+    ["Book your dates", "Pick the days you want to run, and see the price before you commit.", "booking"],
+    ["Add your ad", "Upload a picture. The screen owner checks it before it goes live.", "creative"],
+  ];
+
+  return (
+    <>
+      <section className="advertiser-home-head">
+        <div className="advertiser-home-copy">
+          <span className="eyebrow">{currentUser?.name}</span>
+          <h1>{t(bookings.length ? "Welcome back" : "Let's get your first ad running")}</h1>
+          <p>{t(bookings.length
+            ? "Pick up where you left off, or book another screen."
+            : "You have not booked a screen yet. It takes three steps, and nothing is charged until a screen owner approves your ad.")}</p>
+          <div className="portal-actions">
+            <ProtectedPortalLink className="primary-button" currentUser={currentUser} role="advertiser" view="discover" onLaunch={launch}>Find screens near you</ProtectedPortalLink>
+            {bookings.length ? <ProtectedPortalLink className="ghost-button" currentUser={currentUser} role="advertiser" view="campaigns" onLaunch={launch}>See your campaigns</ProtectedPortalLink> : null}
+          </div>
+          <div className="portal-stats">
+            <Metric label="Screens you can book" value={availableInventory.length} />
+            <Metric label="Ads running" value={live} />
+            <Metric label="Waiting for approval" value={waiting} />
+            <Metric label="Your spend so far" value={money(spend, locale)} />
+          </div>
+        </div>
+        <div className="portal-visual" aria-label={t("Screens near you")}>
+          <div className="preview-toolbar">
+            <span>{t("Screens near you")}</span>
+            <strong>{t("{count} available units", { count: availableInventory.length })}</strong>
+          </div>
+          <div className="portal-map-wrap">
+            <MapLibreInventoryMap
+              inventory={availableInventory}
+              visibleInventory={availableInventory}
+              selectedInventoryId=""
+              selectedLocation={selectedLocation}
+              radius={filters.radius}
+              showCompetitors={false}
+              variant="portal"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="advertiser-home-band">
+        {/* These are numbered because they are a real sequence. Step 2 cannot be
+            done before step 1. */}
+        <SectionHeading eyebrow="Three steps" title="How it works" />
+        <ol className="advertiser-steps">
+          {steps.map(([title, copy, view], index) => (
+            <li className="advertiser-step" key={title}>
+              <span className="advertiser-step-number" aria-hidden="true">{index + 1}</span>
+              <div>
+                <strong>{t(title)}</strong>
+                <p>{t(copy)}</p>
+                <ProtectedPortalLink className="advertiser-step-link" currentUser={currentUser} role="advertiser" view={view} onLaunch={launch}>{index === 0 ? "Start here" : "Open"}</ProtectedPortalLink>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="advertiser-home-band">
+        <SectionHeading eyebrow="Your account" title={bookings.length ? "Your latest bookings" : "You have no bookings yet"} />
+        {recent.length ? (
+          <ul className="advertiser-booking-list">
+            {recent.map((booking) => (
+              <li key={booking.id}>
+                <div>
+                  <strong>{booking.campaign}</strong>
+                  <small>{booking.start} {t("to")} {booking.end}</small>
+                </div>
+                <span className={`state-pill ${bookingWeight(booking.status)}`}>{t(booking.status)}</span>
+                <span className="advertiser-booking-spend">{money(booking.spend, locale)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="advertiser-empty">{t("Your bookings will appear here once you book your first screen.")}</p>
+        )}
+      </section>
+    </>
+  );
+}
+
+// Maps a booking state onto the severity ladder in ADR 0007. Weight rises with
+// how much attention the state needs.
+function bookingWeight(status: Booking["status"]) {
+  if (status === "rejected") return "is-danger";
+  if (status === "pending approval" || status === "creative review") return "is-warning";
+  if (status === "live" || status === "scheduled" || status === "approved") return "is-success";
+  return "is-idle";
 }
 
 function ProtectedPortalLink({

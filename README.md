@@ -151,6 +151,8 @@ Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) w
 
 A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.
 
+The portal at `/` serves two audiences from one component. A signed-out visitor sees the marketing page. A signed-in advertiser sees a task-focused home built by `AdvertiserHome` in [`app/component/portal.tsx`](app/component/portal.tsx). Role selects the branch; the screen is not forked. The civic gateway renders for both, because a test and [DESIGN.md](DESIGN.md) require it at the end of the page for every visitor.
+
 Complexity varies inside the advertiser role as well as between roles. Advertiser density is disclosed progressively, and the interface remembers what a person opens instead of asking them to pick a level. Any mode has two settings, defaults to guided, and never applies to the operator, institution, or government consoles. [ADR 0008](docs/adr/0008-advertiser-complexity-modes.md) records that decision and its boundary.
 
 ## Production Notes
