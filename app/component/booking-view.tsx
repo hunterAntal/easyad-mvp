@@ -36,6 +36,21 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   const showsLoopCapacity = isDigital;
   const creativeReady = Boolean(creativeImage) && !creativeError;
 
+  // The submit button has three independent blocking conditions. Before this,
+  // only one of them changed the label, so the other two left a grey button and
+  // no explanation. Every blocked state now names itself and says what to do.
+  const blockedReason = !canBuy
+    ? "Sign in with an advertiser account to book this screen."
+    : blocked
+      ? isStatic
+        ? "This billboard is already taken for these dates. Pick different dates."
+        : "This screen is full for these dates. Pick different dates, or ask for fewer showings."
+      : !creativeReady
+        ? creativeError
+          ? "Choose a different picture to continue."
+          : "Add your ad picture to continue."
+        : "";
+
   function chooseCreative(file: File | null) {
     setCreativeImage(file);
     setCreativeError(file ? validateBookingImage(file, isDigital) : t(isDigital ? "Choose a PNG, JPEG, or GIF image for approval." : "Choose a PNG or JPEG image for approval."));
@@ -50,7 +65,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   return (
     <section className="grid booking-grid">
       <div className="panel">
-        <PanelHeading eyebrow={isStatic ? "Reserve billboard" : "Reserve loop space"} title={item.name} action={<span className={`status ${blocked ? "bad" : "good"}`}>{t(isStatic ? staticAvailable ? "Available" : "Unavailable" : conflict ? "Capacity full" : "Available")}</span>} />
+        <PanelHeading eyebrow={isStatic ? "Book this billboard" : "Book time on this screen"} title={item.name} action={<span className={`status ${blocked ? "bad" : "good"}`}>{t(isStatic ? staticAvailable ? "Available" : "Unavailable" : conflict ? "Fully booked" : "Available")}</span>} />
         <div className="form-grid">
           {(["advertiser", "campaign", "start", "end"] as (keyof BookingDraft)[]).map((key) => (
             <label key={key}>
@@ -59,15 +74,15 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
             </label>
           ))}
           <label>
-            {t("Ad slots")}
+            {t("Showings per cycle")}
             <input type="number" min={1} max={100} value={draft.adSlots} onChange={(event) => setDraft((current) => ({ ...current, adSlots: Math.max(1, Math.round(Number(event.target.value) || 1)) }))} />
           </label>
         </div>
         <div className="booking-creative-field">
           <label htmlFor="booking-creative-image">
-            <strong>{t("Creative image for approval")}</strong>
+            <strong>{t("Your ad picture")}</strong>
           </label>
-          <small id="booking-creative-requirements">{t(isDigital ? "Required to submit this booking. PNG, JPEG, or animated GIF, up to 50 MB." : "Required to submit this booking. PNG or JPEG, up to 50 MB.")}</small>
+          <small id="booking-creative-requirements">{t(isDigital ? "Needed before you can book. PNG, JPEG, or animated GIF, up to 50 MB." : "Needed before you can book. PNG or JPEG, up to 50 MB.")}</small>
           <input
             ref={fileInputRef}
             id="booking-creative-image"
@@ -77,7 +92,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
             aria-describedby="booking-creative-requirements booking-creative-help booking-creative-error"
             onChange={(event) => chooseCreative(event.target.files?.[0] ?? null)}
           />
-          <small id="booking-creative-help">{t("The operator will review this image with the booking request.")}</small>
+          <small id="booking-creative-help">{t("The screen owner checks your picture before your ad goes live.")}</small>
           {creativeImage ? (
             <div className={`booking-creative-summary${creativeError ? " bad" : ""}`}>
               <span><strong>{creativeImage.name}</strong><small>{formatFileSize(creativeImage.size)}</small></span>
@@ -87,19 +102,20 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
           {creativeError ? <span className="form-error" id="booking-creative-error" role="alert">{creativeError}</span> : <span id="booking-creative-error" />}
         </div>
         <div className="quote">
-          <Metric label="Estimated spend" value={money(estimateSpend(item, draft.start, draft.end, draft.adSlots), locale)} />
-          <Metric label="Run length" value={t("{count} days", { count: daysBetween(draft.start, draft.end) })} />
-          <Metric label="Estimated impressions" value={formatNumber(Math.round((item.impressions * daysBetween(draft.start, draft.end)) / 14))} />
+          <Metric label="Total cost" value={money(estimateSpend(item, draft.start, draft.end, draft.adSlots), locale)} />
+          <Metric label="How long it runs" value={t("{count} days", { count: daysBetween(draft.start, draft.end) })} />
+          <Metric label="Estimated views" value={formatNumber(Math.round((item.impressions * daysBetween(draft.start, draft.end)) / 14))} />
           {showsLoopCapacity ? <>
-            <Metric label="Reserved loop time" value={`${requestedSeconds}s`} />
-            <Metric label="Available loop time" value={`${remainingSeconds}s / ${item.maxLoopSeconds}s`} />
-            <Metric label="Booked loop time" value={`${bookedSeconds}s`} />
+            <Metric label="Your time each cycle" value={t("{count}s", { count: requestedSeconds })} />
+            <Metric label="Time still free" value={t("{count}s of {total}s", { count: remainingSeconds, total: item.maxLoopSeconds })} />
+            <Metric label="Time already booked" value={t("{count}s", { count: bookedSeconds })} />
           </> : null}
         </div>
-        <AsyncButton className="primary-button wide" disabled={blocked || !canBuy || !creativeReady} onClick={() => creativeImage ? onSubmit(creativeImage) : Promise.resolve(false)} successMessage="Booking and image submitted for approval." errorMessage="Could not submit this booking. Keep the selected image and try again.">{canBuy ? "Submit booking for approval" : "Sign in as advertiser to buy"}</AsyncButton>
+        {blockedReason ? <p className="booking-blocked-reason" id="booking-submit-reason">{t(blockedReason)}</p> : null}
+        <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button wide" disabled={blocked || !canBuy || !creativeReady} onClick={() => creativeImage ? onSubmit(creativeImage) : Promise.resolve(false)} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Keep the selected picture and try again.">{canBuy ? "Send booking request" : "Sign in to book"}</AsyncButton>
       </div>
       <div className="panel">
-        <PanelHeading eyebrow={isStatic ? "Placement availability" : "Shared loop capacity"} title="Schedule check" />
+        <PanelHeading eyebrow={isStatic ? "Placement availability" : "What else is booked"} title="Dates already taken" />
         <div className="timeline large">
           {bookings.filter((booking) => booking.inventoryId === item.id).map((booking) => (
             <div key={booking.id} className={overlaps(draft.start, draft.end, booking.start, booking.end) ? "warning" : ""}>
@@ -111,7 +127,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
         </div>
       </div>
       <div className="panel span-2">
-        <PanelHeading eyebrow="Advertiser dashboard" title="Booking pipeline" />
+        <PanelHeading eyebrow="Your account" title="Your bookings" />
         <BookingsTable bookings={bookings} inventory={inventory} />
       </div>
     </section>

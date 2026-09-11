@@ -616,7 +616,7 @@ export default function OohApp({
     <div className={`shell${surface === "government" ? " government-shell" : ""}`}>
       <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} surface={surface} />
+        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>

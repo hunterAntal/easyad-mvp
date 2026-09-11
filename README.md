@@ -141,6 +141,16 @@ Use `--line-strong` for the edge of a control. Use `--line` for a decorative hai
 
 The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. [DESIGN.md](DESIGN.md) mirrors them. The measured basis, the rejected alternatives, and the AODA obligation are in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
 
+## Advertiser Vocabulary
+
+The product serves two populations with one component set. Operators, institutions, and government staff are trained, so their screens keep the precise operational terms: loop time, inventory, occupancy. An advertiser is often a small-business owner buying outdoor media for the first time, so advertiser screens name the task instead of the trade.
+
+Role selects the vocabulary. No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/component/dashboard-shell.tsx`](app/component/dashboard-shell.tsx) hold the advertiser wording, and the rest is the English string in each advertiser-only component.
+
+Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
+
+A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.
+
 ## Production Notes
 
 The production target is a stateless Next.js container on ECS Fargate, RDS PostgreSQL, and private S3 media storage. See [the AWS deployment runbook](docs/AWS_DEPLOYMENT.md) for the complete build, IAM, migration, health-check, and release procedure.
