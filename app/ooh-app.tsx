@@ -591,9 +591,9 @@ export default function OohApp({
         if (currentUser?.role === "admin") return <AccountManagementView users={managedUsers} bookings={bookings} inventory={inventory} creatives={creatives} mediaResources={mediaResources} onCreateAccount={createManagedUser} onUpdateAccount={updateManagedUser} onDeleteAccount={deleteManagedUser} />;
         return null;
       case "reports":
-        return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} />;
+        return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} isAdvertiser={role === "advertiser"} />;
       case "billing":
-        return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} paymentsEnabled={featureFlags.payments} />;
+        return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} isAdvertiser={role === "advertiser"} paymentsEnabled={featureFlags.payments} />;
       default:
         return null;
     }

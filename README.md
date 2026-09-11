@@ -145,7 +145,9 @@ The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. 
 
 The product serves two populations with one component set. Operators, institutions, and government staff are trained, so their screens keep the precise operational terms: loop time, inventory, occupancy. An advertiser is often a small-business owner buying outdoor media for the first time, so advertiser screens name the task instead of the trade.
 
-Role selects the vocabulary. No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/component/dashboard-shell.tsx`](app/component/dashboard-shell.tsx) hold the advertiser wording, and the rest is the English string in each advertiser-only component.
+Role selects the vocabulary on every shared screen, through an `isAdvertiser` flag: `dashboard-shell`, `campaign-spaces-view`, `content-library-view`, `ReportsView` and `BillingView`. An advertiser never sees the marketplace's own revenue split, because the platform's cut and the operator payable are not a buyer's business.
+
+No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/component/dashboard-shell.tsx`](app/component/dashboard-shell.tsx) hold the advertiser wording, and the rest is the English string in each advertiser-only component.
 
 Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
 

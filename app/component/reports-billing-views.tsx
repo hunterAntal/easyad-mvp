@@ -13,7 +13,9 @@ export function ReportsView({
   transactions,
   onRunDelivery,
   canRunDelivery,
+  isAdvertiser = false,
 }: {
+  isAdvertiser?: boolean;
   bookings: Booking[];
   inventory: InventoryItem[];
   transactions: Transaction[];
@@ -41,12 +43,12 @@ export function ReportsView({
   return (
     <section className="grid reports-grid">
       <div className="panel span-2">
-        <PanelHeading eyebrow="Campaign analytics and reporting" title="Performance overview" />
+        <PanelHeading eyebrow={isAdvertiser ? "Results" : "Campaign analytics and reporting"} title={isAdvertiser ? "How your ads did" : "Performance overview"} />
         <div className="report-metrics">
-          <Metric label="Delivered impressions" value={formatNumber(totalImpressions)} />
-          <Metric label="Proof-of-play completion" value={`${popRate}%`} />
-          <Metric label="Active campaigns" value={bookings.filter((booking) => ["scheduled", "live"].includes(booking.status)).length} />
-          <Metric label="Verified CPM" value={money(cpm, locale)} />
+          <Metric label={isAdvertiser ? "Times your ad was seen" : "Delivered impressions"} value={formatNumber(totalImpressions)} />
+          <Metric label={isAdvertiser ? "Confirmed playback" : "Proof-of-play completion"} value={`${popRate}%`} />
+          <Metric label={isAdvertiser ? "Ads running now" : "Active campaigns"} value={bookings.filter((booking) => ["scheduled", "live"].includes(booking.status)).length} />
+          <Metric label={isAdvertiser ? "Cost per 1,000 views" : "Verified CPM"} value={money(cpm, locale)} />
         </div>
         {/* This chart used to plot inventory.impressions, which is the screen's
             own audience figure for screens this account may never have booked.
@@ -72,7 +74,7 @@ export function ReportsView({
         <div className="pop-list">{bookings.map((booking) => <div key={booking.id}><strong>{booking.id}</strong><span>{booking.campaign}</span><meter min={0} max={100} value={booking.pop} /><small>{t("{percent}% verified - {amount} collected platform-wide", { percent: booking.pop, amount: money(collected, locale) })}</small></div>)}</div>
       </div>
       ) : null}
-      <div className="panel span-2"><PanelHeading eyebrow="Campaigns" title="Reporting table" /><BookingsTable bookings={bookings} inventory={inventory} /></div>
+      <div className="panel span-2"><PanelHeading eyebrow="Campaigns" title={isAdvertiser ? "Every ad you have run" : "Reporting table"} /><BookingsTable bookings={bookings} inventory={inventory} /></div>
     </section>
   );
 }
@@ -82,8 +84,10 @@ export function BillingView({
   transactions,
   onSettle,
   canManage,
+  isAdvertiser = false,
   paymentsEnabled = false,
 }: {
+  isAdvertiser?: boolean;
   bookings: Booking[];
   transactions: Transaction[];
   onSettle: (bookingId: string, action: "pay" | "refund") => Promise<boolean>;
@@ -110,20 +114,23 @@ export function BillingView({
   return (
     <section className="grid billing-grid">
       <div className="panel span-2">
-        <PanelHeading eyebrow="Offline commercial terms" title="Commercial ledger" />
+        <PanelHeading eyebrow={isAdvertiser ? "Your account" : "Offline commercial terms"} title={isAdvertiser ? "What you owe" : "Commercial ledger"} />
         <p className="commercial-policy" role="note">
           {paymentsEnabled
             ? t("Demo only: mock charge and refund controls are enabled. Do not use them for real payments.")
             : t("Payment collection is turned off. Record quotes and approvals offline; no card will be charged.")}
         </p>
         <div className="report-metrics">
-          <Metric label="Gross billings" value={money(gross, locale)} />
-          <Metric label="Platform share" value={money(platform, locale)} />
-          <Metric label="Operator payable" value={money(operator, locale)} />
-          <Metric label="Open invoices" value={outstanding} />
+          <Metric label={isAdvertiser ? "Your total" : "Gross billings"} value={money(gross, locale)} />
+          {/* The platform's cut and what it pays the screen owner are the
+              marketplace's own revenue split. A buyer has no use for either,
+              and showing a take rate to the person being charged is wrong. */}
+          {isAdvertiser ? null : <Metric label="Platform share" value={money(platform, locale)} />}
+          {isAdvertiser ? null : <Metric label="Operator payable" value={money(operator, locale)} />}
+          <Metric label={isAdvertiser ? "Still to pay" : "Open invoices"} value={outstanding} />
         </div>
         <div className="inventory-table billing-table">
-          <div className="table-head"><span>{t("Reference")}</span><span>{t("Advertiser")}</span><span>{t("Gross")}</span><span>{t("Platform")}</span><span>{t("Operator")}</span><span>{t("Gateway")}</span><span>{t("Status")}</span></div>
+          {rows.length ? <div className="table-head"><span>{t("Reference")}</span><span>{t("Advertiser")}</span><span>{t(isAdvertiser ? "Amount" : "Gross")}</span><span>{t("Platform")}</span><span>{t("Operator")}</span><span>{t("Gateway")}</span><span>{t("Status")}</span></div> : null}
           {rows.map(({ booking, amount, platformFee, operatorPayout, status, gatewayRef }) => {
             const paid = status === "paid";
             return (
