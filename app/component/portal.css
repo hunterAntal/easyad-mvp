@@ -718,10 +718,21 @@
   display: flex;
 }
 
+/* The label was weight 400 in --muted against a weight 800 number, so it read
+   as an afterthought. It now uses the product's canonical eyebrow treatment
+   (uppercase, .08em tracking, weight 800) from .eyebrow in shared-ui.css, one
+   step darker for presence. DESIGN.md sets sentence case for labels and makes
+   short uppercase eyebrows the exception; a stat-tile label is that exception,
+   and it is the same treatment the panel headings already use. */
 .advertiser-home-copy .portal-stats .metric span {
+  color: #46515a;
+  text-transform: uppercase;
   text-wrap: balance;
-  max-width: 15ch;
-  line-height: 1.3;
+  letter-spacing: .08em;
+  max-width: 16ch;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .advertiser-home-copy .portal-stats .metric strong {
