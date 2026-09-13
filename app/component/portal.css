@@ -159,7 +159,11 @@
   align-items: center;
   gap: clamp(20px,4vw,52px);
   margin-top: -2px;
-  padding: 18px clamp(18px,4vw,56px);
+  /* This band is the last thing on the page, and the chat launcher is fixed at
+     bottom 22px right 22px. Its right-aligned small print sat underneath it, so
+     the band reserves that corner. */
+  padding: 26px clamp(18px,4vw,56px);
+  padding-right: calc(clamp(18px,4vw,56px) + 74px);
   position: relative;
   overflow: hidden;
   display: grid;
@@ -178,12 +182,17 @@
 }
 
 .portal-institution-gateway > * { z-index: 1; position: relative; }
-.institution-gateway-copy { grid-template-columns: minmax(180px,.55fr) minmax(280px,1.45fr); align-items: center; gap: 5px 24px; display: grid; }
+/* The eyebrow used to sit in its own column, vertically centred beside a taller
+   title-and-paragraph block, so nothing shared an edge and the band read as
+   three loose pieces. It now stacks on one left edge, which is the same rule
+   .portal-section-heading follows. The title was capped at 20ch and wrapped
+   mid-phrase; the paragraph ran to 76ch and broke "sign-in" across lines. */
+.institution-gateway-copy { align-content: center; gap: 7px; display: grid; }
 .institution-gateway-copy h2,
 .institution-gateway-copy p { margin: 0; }
-.institution-gateway-copy .eyebrow { color: #6ee0b4; }
-.institution-gateway-copy h2 { max-width: 20ch; font-size: clamp(1.18rem,2vw,1.65rem); line-height: 1.08; }
-.institution-gateway-copy p { color: #d7e5dfc9; max-width: 76ch; grid-column: 2; font-size: .8rem; line-height: 1.48; }
+.institution-gateway-copy .eyebrow { color: #6ee0b4; line-height: 1.35; }
+.institution-gateway-copy h2 { max-width: 30ch; font-size: clamp(1.18rem,2vw,1.6rem); line-height: 1.15; text-wrap: balance; }
+.institution-gateway-copy p { color: #d7e5dfc9; max-width: 64ch; font-size: .82rem; line-height: 1.55; text-wrap: pretty; }
 
 .institution-gateway-action { justify-items: end; gap: 5px; min-width: 208px; display: grid; }
 .institution-gateway-link { color: #f3f8f5; border: 1px solid #ffffff36; border-radius: 7px; align-items: center; gap: 8px; min-height: 40px; padding: 0 13px; font-size: .78rem; font-weight: 850; display: inline-flex; transition: background .16s,border-color .16s,transform .16s; }
