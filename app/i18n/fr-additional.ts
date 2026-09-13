@@ -1,4 +1,15 @@
 export const frAdditional: Record<string, string> = {
+  "Distance": "Distance",
+  "Within {count} km": "Dans un rayon de {count} km",
+  "Most per day": "Maximum par jour",
+  "Any price": "Tout prix",
+  "Up to {amount}": "Jusqu’à {amount}",
+  "Least views": "Vues minimales",
+  "Least passers-by": "Passants minimaux",
+  "Neighbourhood income": "Revenu du quartier",
+  "Any": "Tout",
+  "{count}+": "{count} et plus",
+  "{amount}+": "{amount} et plus",
   // Geolocation strings from origin/main (PR #1).
   "Finding your location…": "Recherche de votre position…",
   "Location unavailable — showing Canada overview": "Position indisponible — aperçu du Canada",
