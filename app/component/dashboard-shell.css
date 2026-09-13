@@ -1271,3 +1271,121 @@
     display: none;
   }
 }
+
+/* ---- Buying steps ---------------------------------------------------------
+   Replaces a static "Step 1 of 4" eyebrow that promised a fourth step the
+   product does not have. Each step is a real control, the current one carries
+   aria-current="step", and a step that cannot be reached yet says why instead
+   of leading to an empty screen. */
+.buying-steps {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.buying-step {
+  align-items: center;
+  display: flex;
+}
+
+.buying-step + .buying-step::before {
+  content: "";
+  background: var(--line-strong);
+  width: 14px;
+  height: 1px;
+  margin-right: 6px;
+}
+
+.buying-step > a,
+.buying-step > span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 6px;
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  transition: background .14s, border-color .14s, color .14s;
+}
+
+.buying-step-mark {
+  border-radius: 50%;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: .7rem;
+  font-weight: 800;
+  display: grid;
+}
+
+.buying-step-mark svg {
+  width: 12px;
+  height: 12px;
+}
+
+.buying-step.is-current > a {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: var(--green);
+}
+
+.buying-step.is-current .buying-step-mark {
+  color: #fff;
+  background: var(--green);
+}
+
+.buying-step.is-done > a {
+  color: var(--state-success-ink);
+  background: var(--panel);
+  border-color: #9dc9b5;
+}
+
+.buying-step.is-done .buying-step-mark {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+}
+
+.buying-step.is-ahead > a {
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.buying-step.is-ahead .buying-step-mark {
+  color: var(--muted);
+  background: var(--state-idle-surface);
+}
+
+.buying-step.is-ahead > a:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+/* Not a dead control: it states the reason on hover and is not a link. */
+.buying-step.is-locked > span {
+  color: var(--faint, #8a949c);
+  background: var(--state-idle-surface);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.buying-step.is-locked .buying-step-mark {
+  color: var(--muted);
+  background: #0000;
+}
+
+@media (max-width: 560px) {
+  .buying-step-label {
+    display: none;
+  }
+
+  .buying-step > a,
+  .buying-step > span {
+    padding: 5px;
+  }
+}

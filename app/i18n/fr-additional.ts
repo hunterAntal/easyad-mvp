@@ -1,4 +1,5 @@
 export const frAdditional: Record<string, string> = {
+  "Buy screen time": "Acheter du temps d’écran",
   "Collapse menu": "Réduire le menu",
   "Expand menu": "Agrandir le menu",
   "Distance": "Distance",
