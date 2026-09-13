@@ -1136,6 +1136,22 @@
   padding: 0;
 }
 
+/* .nav a is a grid of "20px minmax(0,1fr) 5px". The 1fr track fills the box and
+   pins the icon into the 20px column on the left, 11.5px off centre, however
+   well the box itself is centred. Collapsing the tracks is what moves the
+   glyph. Same for the workspace switcher, which was 8.5px off for the same
+   reason. */
+.sidebar.is-rail .nav a,
+.sidebar.is-rail .nav button,
+.sidebar.is-rail .workspace-switcher-button,
+.sidebar.is-rail .sidebar-signout {
+  grid-template-columns: auto;
+  grid-template-rows: auto;
+  justify-content: center;
+  align-content: center;
+  gap: 0;
+}
+
 .sidebar.is-rail .nav a svg,
 .sidebar.is-rail .workspace-switcher-button svg,
 .sidebar.is-rail .sidebar-signout svg {
