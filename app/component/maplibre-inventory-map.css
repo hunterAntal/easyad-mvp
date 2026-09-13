@@ -456,7 +456,9 @@
   padding: 10px;
   display: flex;
   position: absolute;
-  bottom: 14px;
+  /* The MapLibre attribution control sits in the bottom-right corner and was
+     printing straight through the legend. The legend now clears it. */
+  bottom: 40px;
   left: 14px;
   box-shadow: 0 12px 26px #17202a24;
 }
