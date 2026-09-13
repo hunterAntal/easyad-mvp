@@ -1158,14 +1158,57 @@
   padding: 0;
 }
 
+/* 44px, not 40px. The centres already matched, but a 40px filled badge sitting
+   between 44px squares has its edges 2px inside theirs, and the eye reads the
+   edges, not the centre. */
 .sidebar.is-rail .brand-mark {
   color: #16222b;
   background: #eef3f1;
   border-radius: 10px;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   font-size: .8rem;
+}
+
+/* The workspace switcher is a control, not a destination. It was carrying its
+   own green, so two different green boxes sat in one column and neither read
+   as "you are here". Only the selected nav item is green now. */
+.sidebar.is-rail .workspace-switcher-button {
+  color: #9fb0bb;
+  background: #ffffff0a;
+  border: 1px solid #ffffff14;
+}
+
+.sidebar.is-rail .workspace-switcher-button:hover {
+  color: #fff;
+  background: #ffffff1a;
+}
+
+.sidebar.is-rail .workspace-switcher-icon {
+  background: none;
+  width: auto;
+  height: auto;
+}
+
+/* The sign-out sits in a form inside the tenant card, which was not centring
+   its own child. Measured 22.5px off the column. */
+.sidebar.is-rail .tenant-card {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  width: 100%;
+  margin-top: auto;
+  display: grid;
+}
+
+.sidebar.is-rail .tenant-card form {
+  justify-items: center;
+  width: 100%;
+  display: grid;
+}
+
+.sidebar.is-rail .tenant-avatar {
+  display: none;
 }
 
 .sidebar.is-rail .nav-active-mark {
