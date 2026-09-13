@@ -1071,9 +1071,19 @@
   transform: translateX(50%);
 }
 
+.sidebar.is-rail .nav {
+  align-items: center;
+}
+
+.sidebar.is-rail .nav-group {
+  justify-items: center;
+}
+
 .sidebar.is-rail .nav-label,
 .sidebar.is-rail .nav-group-label,
-.sidebar.is-rail .brand div,
+/* .brand-mark is itself a div inside .brand, so a bare ".brand div" clipped the
+   "EA" badge to 1x1 and left a hole at the top of the rail. */
+.sidebar.is-rail .brand > div:not(.brand-mark),
 .sidebar.is-rail .tenant-identity,
 .sidebar.is-rail .workspace-switcher-copy,
 .sidebar.is-rail .workspace-switcher-chevron,
@@ -1099,18 +1109,63 @@
   padding-top: 12px;
 }
 
+/* Every control in the rail is the same 44px square. Before this the nav items
+   were 48x40, the workspace switcher 48x60 and the toggle 30x30, so three
+   different shapes stacked down one column and the active highlight read as a
+   stretched box rather than a button. */
 .sidebar.is-rail .nav a,
 .sidebar.is-rail .workspace-switcher-button,
 .sidebar.is-rail .government-marketplace-link,
-.sidebar.is-rail .sidebar-signout {
+.sidebar.is-rail .sidebar-signout,
+.sidebar.is-rail .sidebar-rail-toggle {
+  border-radius: 10px;
   justify-content: center;
+  place-items: center;
   gap: 0;
-  width: 48px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
 }
 
-.sidebar.is-rail .nav a {
-  min-height: 40px;
+.sidebar.is-rail .nav a svg,
+.sidebar.is-rail .workspace-switcher-button svg,
+.sidebar.is-rail .sidebar-signout svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The selected item reads by weight, not by a faint tint: a green wash, a green
+   icon, and a green edge. Same ladder as ADR 0007. */
+.sidebar.is-rail .nav a.active {
+  color: #7fd3b1;
+  background: #1f7a5a2e;
+  border-color: #1f7a5a8c;
+}
+
+.sidebar.is-rail .workspace-switcher-icon {
+  margin: 0;
+}
+
+/* The switcher's wrapper carries its own 46x62 panel, which sat behind the
+   44x44 button and read as a second, larger box. In the rail the button is the
+   only surface. */
+.sidebar.is-rail .workspace-switcher {
+  background: none;
+  border: 0;
+  width: 44px;
+  padding: 0;
+}
+
+.sidebar.is-rail .brand-mark {
+  color: #16222b;
+  background: #eef3f1;
+  border-radius: 10px;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  font-size: .8rem;
 }
 
 .sidebar.is-rail .nav-active-mark {
