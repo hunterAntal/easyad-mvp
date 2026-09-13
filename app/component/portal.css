@@ -703,6 +703,34 @@
   display: grid;
 }
 
+/* Two of the four labels wrap to a second line and two do not, so the numbers
+   sat at four different heights. The label sits at the top, the number is
+   pushed to the bottom, and the grid gives every tile the same height, so the
+   numbers share one baseline whatever the label does. */
+.advertiser-home-copy .portal-stats .metric {
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  min-height: 92px;
+  padding: 14px 12px;
+  display: flex;
+}
+
+.advertiser-home-copy .portal-stats .metric span {
+  text-wrap: balance;
+  max-width: 15ch;
+  line-height: 1.3;
+}
+
+.advertiser-home-copy .portal-stats .metric strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
 .advertiser-home-band {
   padding: 28px 56px;
 }
