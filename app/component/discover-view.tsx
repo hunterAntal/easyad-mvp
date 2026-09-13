@@ -37,7 +37,7 @@ export default function DiscoverView(props: {
   return (
     <section className="grid discover-grid">
       <div className="panel filters-panel">
-        <PanelHeading eyebrow="Spatial filters" title="Discovery" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
+        <PanelHeading eyebrow="Filters" title="Narrow your search" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
         <FiltersPanel {...props} />
       </div>
       <div className="map-stage">
@@ -86,7 +86,10 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
         <span>{t("{amount}/day", { amount: money(item.price, locale) })}</span>
       </div>
       {isStaticInventory(item) ? <span className={`status ${availability === "Available" ? "good" : "bad"}`}>{t(availability)}</span> : null}
-      {item.tags?.length ? <div className="device-tag-list">{item.tags.slice(0, 4).map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      {/* Four tag chips on each of eight cards is 32 chips in a scanning list,
+          and the format tag repeats the format line directly above it. The
+          list carries what you scan by; the detail panel below still lists
+          every tag for the selected screen. */}
       <Meter value={item.occupancy} />
       <div className="card-stats">
         <span>{t("{count} impressions", { count: formatNumber(item.impressions) })}</span>
@@ -109,12 +112,13 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
         <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />
         <Metric label="Impressions" value={formatNumber(item.impressions)} />
         <Metric label="Traffic" value={formatNumber(item.traffic)} />
-        <Metric label="Income index" value={money(item.income, locale)} />
-        <Metric label="Audience" value={t(item.audience)} />
-        <Metric label="Competitors" value={t(item.competitor)} />
-        <Metric label="Nearby businesses" value={businesses.filter((business) => mapDistanceKm(item, business) < 13).length} />
         {isStaticInventory(item) ? <Metric label="Status" value={t(availability)} /> : null}
       </div>
+      {/* Income index, audience, competitor presence and nearby-business counts
+          are planning figures for a media buyer, not the four numbers a person
+          decides a booking on. The full profile still carries every one of
+          them, so this defers detail without removing capability. */}
+      <a className="detail-profile-link" href={`/inventory/${item.id}`}>{t("See everything about this screen")}</a>
       <div className="spec-box">
         <strong>{t("Creative spec")}</strong>
         <span>{t(spec.spec)}</span>

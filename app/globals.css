@@ -3,14 +3,36 @@
   --ink: #131b24;
   --muted: #5b6770;
   --panel: #fff;
+  /* Decorative hairline only. It gives 1.23:1, so it must never be the edge
+     of a control. Use --line-strong for a control edge (WCAG 2.2 SC 1.4.11). */
   --line: #e4e8ea;
+  --line-strong: #767f86;
   --green: #1f7a5a;
   --green-dark: #14503c;
   --blue: #2f5f9f;
-  --coral: #d65f46;
-  --gold: #c29534;
-  --soft-green: #e7f2ec;
+  --blue-dark: #1f497a;
+  --soft-green: #e3f2ea;
   --soft-blue: #e8eef6;
+
+  /* Status ladder. Severity is encoded by visual weight, not by hue.
+     Colour blindness removes hue. It never removes lightness.
+     Every state must also carry an icon shape and a text label. */
+  --state-idle-surface: #eef1f3;
+  --state-idle-ink: #5b6770;
+  --state-success-surface: #e3f2ea;
+  --state-success-ink: #14503c;
+  --state-warning-surface: #fbeab4;
+  --state-warning-ink: #7a5510;
+  --state-danger: #b3192e;
+  --state-danger-surface: #fbe9ec;
+  --state-danger-ink: #a11228;
+  --state-info-surface: #e8eef6;
+  --state-info-ink: #1f497a;
+
+  /* Reserved for an active screen override only. Never use it for a routine
+     state. It must not resemble a normal campaign action. */
+  --state-emergency-surface: #1a1206;
+  --state-emergency-ink: #ffc845;
   --radius: 12px;
   --radius-sm: 9px;
   --shadow-sm: 0 1px 2px #101b240a, 0 2px 8px #101b240d;
@@ -343,14 +365,17 @@ textarea.resize-none {
   --workspace-ink: #162027;
   --workspace-muted: #66727b;
   --workspace-line: #dfe4e7;
-  --workspace-line-strong: #ccd4d8;
+  /* A control edge needs 3:1. The old #ccd4d8 gave 1.28:1. */
+  --workspace-line-strong: var(--line-strong);
   --workspace-nav: #111b22;
   --workspace-nav-soft: #1b2932;
-  --workspace-green: #187a5c;
-  --workspace-green-soft: #e6f2ed;
-  --workspace-blue: #356ca5;
-  --workspace-amber: #c18a28;
-  --workspace-danger: #b84f3f;
+  /* These four names stay for the existing call sites, but they now resolve to
+     the one palette above. DESIGN.md forbids a second token palette. */
+  --workspace-green: var(--green);
+  --workspace-green-soft: var(--soft-green);
+  --workspace-blue: var(--blue);
+  --workspace-amber: var(--state-warning-ink);
+  --workspace-danger: var(--state-danger);
   --workspace-shadow: 0 1px 2px #111b220a, 0 8px 24px #111b220f;
 }
 

@@ -270,7 +270,7 @@
 }
 
 .maplibre-business {
-  background: var(--gold);
+  background: var(--state-warning-ink);
   border-radius: 4px;
   width: 14px;
   height: 14px;
@@ -380,7 +380,7 @@
 }
 
 .fallback-business {
-  background: var(--gold);
+  background: var(--state-warning-ink);
   border: 2px solid #fff;
   border-radius: 4px;
   width: 14px;
@@ -456,7 +456,9 @@
   padding: 10px;
   display: flex;
   position: absolute;
-  bottom: 14px;
+  /* The MapLibre attribution control sits in the bottom-right corner and was
+     printing straight through the legend. The legend now clears it. */
+  bottom: 40px;
   left: 14px;
   box-shadow: 0 12px 26px #17202a24;
 }
@@ -488,7 +490,7 @@
 .legend-device.selected { background: var(--workspace-green); box-shadow: 0 0 0 2px var(--soft-green); }
 .legend-city { background: var(--workspace-green); }
 .legend-square {
-  background: var(--gold);
+  background: var(--state-warning-ink);
 }
 
 .legend-square {

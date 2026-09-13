@@ -31,6 +31,22 @@ npm run dev
 
 `npm run init` installs dependencies, copies `.env.example` to `.env.local` when needed, starts the bundled PostgreSQL service with Docker Compose, and waits until the configured databases are reachable.
 
+### Docker credential helper on macOS
+
+The `docker compose` command needs the Docker Desktop credential helper. Homebrew installs the `docker` binary in a different directory. The helper `docker-credential-desktop` stays in the Docker Desktop application directory.
+
+Add the helper directory to your `PATH` before you run `npm run init`:
+
+```bash
+export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+```
+
+If the `PATH` does not contain this directory, the image pull fails with this error:
+
+```text
+error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH
+```
+
 Seed the documented governmental, institutional, advertiser, and device fixtures for local development:
 
 ```bash
@@ -39,10 +55,34 @@ npm run seed:demo-data
 
 The stable identities, demo credentials, ownership graph, and AI fixture rules are documented in [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md). The older `seed:test-data` command remains available for the temporary test-account workflow.
 
+### Local demo credentials file
+
+The `npm run seed:demo-data` command reads the local file `DEMO_ACCOUNTS.md`. The repository does not contain this file. The `.gitignore` file excludes it. Never commit this file and never upload it.
+
+Create the file in the repository root before you run the seed command. Use a Markdown table with four columns. Put the stable user ID in the first column. Put the email in the third column. Put the password in the fourth column.
+
+```markdown
+| Stable user ID | Name | Email | Password |
+|---|---|---|---|
+| `USR-DEMO-GOV-TB` | City of Thunder Bay Screen Operations | `gov.thunderbay@demo.local` | `<password>` |
+```
+
+The table needs one row for each of the eight demo users. [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md) lists the eight stable user IDs. The seed command stops with an error if a row is missing.
+
 The local compose setup creates:
 
 - `ooh_market` for the app
 - `ooh_market_test` for integration tests
+
+### Application origin and port
+
+The `npm run dev` command uses port 3000. Another application can hold port 3000. Start the server on a different port in this condition:
+
+```bash
+npx next dev -p 3001
+```
+
+Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
 
 Run the PostgreSQL integration test with:
 
@@ -90,6 +130,36 @@ The public landing page links to this workspace from the middle of the page; it 
 Authorized institutional staff can create time-limited AMBER, evacuation, or public-safety screen overrides for selected published devices. These overrides replace regular content only on the application's owned screens—they do not issue an alert through Alert Ready, wireless emergency alerts, police systems, or another official public-alert network.
 
 Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.
+
+## Colour and Status Encoding
+
+The design system encodes status by visual weight, not by hue. A colour-vision deficiency removes a hue channel, but it never removes lightness. Each state is a surface-and-ink pair on a five-step severity ladder, and weight 4 is reserved for an active screen override.
+
+Colour alone never encodes a state. Every state also carries a distinct icon shape and a text label.
+
+Use `--line-strong` for the edge of a control. Use `--line` for a decorative hairline only, because it gives 1.23:1 and WCAG 2.2 SC 1.4.11 needs 3:1.
+
+The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. [DESIGN.md](DESIGN.md) mirrors them. The measured basis, the rejected alternatives, and the AODA obligation are in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
+
+## Advertiser Vocabulary
+
+The product serves two populations with one component set. Operators, institutions, and government staff are trained, so their screens keep the precise operational terms: loop time, inventory, occupancy. An advertiser is often a small-business owner buying outdoor media for the first time, so advertiser screens name the task instead of the trade.
+
+Role selects the vocabulary on every shared screen, through an `isAdvertiser` flag: `dashboard-shell`, `campaign-spaces-view`, `content-library-view`, `ReportsView` and `BillingView`. An advertiser never sees the marketplace's own revenue split, because the platform's cut and the operator payable are not a buyer's business.
+
+No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/component/dashboard-shell.tsx`](app/component/dashboard-shell.tsx) hold the advertiser wording, and the rest is the English string in each advertiser-only component.
+
+Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
+
+Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
+
+Every empty state names a next action, through the shared `EmptyState` in [`app/component/shared-ui.tsx`](app/component/shared-ui.tsx). A column header is never shown above an empty table.
+
+A disabled control must state why it is disabled and what to do next. See the blocked-reason line in [`app/component/booking-view.tsx`](app/component/booking-view.tsx). A silent disabled control is a defect.
+
+The portal at `/` serves two audiences from one component. A signed-out visitor sees the marketing page. A signed-in advertiser sees a task-focused home built by `AdvertiserHome` in [`app/component/portal.tsx`](app/component/portal.tsx). Role selects the branch; the screen is not forked. The civic gateway renders for both, because a test and [DESIGN.md](DESIGN.md) require it at the end of the page for every visitor.
+
+Complexity varies inside the advertiser role as well as between roles. Advertiser density is disclosed progressively, and the interface remembers what a person opens instead of asking them to pick a level. Any mode has two settings, defaults to guided, and never applies to the operator, institution, or government consoles. [ADR 0008](docs/adr/0008-advertiser-complexity-modes.md) records that decision and its boundary.
 
 ## Production Notes
 

@@ -83,3 +83,18 @@
   flex-direction: column;
 }
 }
+
+/* A blocked submit is guidance, not a failure, so it uses the weight-2 caution
+   pair rather than the error style. It sits directly above the button it
+   explains and is announced through aria-describedby. */
+.booking-blocked-reason {
+  color: var(--state-warning-ink);
+  background: var(--state-warning-surface);
+  border: 1px solid var(--state-warning-ink);
+  border-radius: 8px;
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  font-size: .84rem;
+  font-weight: 600;
+  line-height: 1.45;
+}

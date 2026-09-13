@@ -690,6 +690,12 @@ function fitDefaultOperatingRadius(map: MapLibreMap, center: MapPoint, container
     duration: 0,
     maxZoom: 11,
   });
+  // Fitting the 30 km operating radius lands at zoom 8.46 in a panel-width
+  // container, and DEVICE_MARKER_MIN_ZOOM is 8.5. Missing by 0.04 meant the
+  // default view replaced every device pin with a city-count marker and told
+  // the reader to zoom in, on a map whose whole purpose is showing those
+  // devices. fitBounds has no minZoom, so the floor is applied afterwards.
+  if (map.getZoom() < DEVICE_MARKER_MIN_ZOOM) map.setZoom(DEVICE_MARKER_MIN_ZOOM);
 }
 
 function radiusBounds(center: MapPoint, radiusKm: number): [[number, number], [number, number]] {
