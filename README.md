@@ -76,13 +76,9 @@ The local compose setup creates:
 
 ### Application origin and port
 
-The `npm run dev` command uses port 3000. Another application can hold port 3000. Start the server on a different port in this condition:
+The `npm run dev` and `npm run start` commands are pinned to port **3001** in `package.json`. The port is fixed on purpose. Another EasyAD prototype runs on port 3000 on at least one machine, and an unpinned port let the two be confused for each other, which cost real debugging time.
 
-```bash
-npx next dev -p 3001
-```
-
-Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
+Always open `http://localhost:3001`. Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
 
 Run the PostgreSQL integration test with:
 

@@ -1113,11 +1113,18 @@
    were 48x40, the workspace switcher 48x60 and the toggle 30x30, so three
    different shapes stacked down one column and the active highlight read as a
    stretched box rather than a button. */
+/* Only the selected item carries a surface. Everything else is a bare icon.
+   Before this the column stacked five different treatments -- a bordered
+   toggle, a filled white badge, a bordered switcher, bare icons, then a green
+   box -- which is what read as disorganised. Alignment was never the fault. */
 .sidebar.is-rail .nav a,
 .sidebar.is-rail .workspace-switcher-button,
 .sidebar.is-rail .government-marketplace-link,
 .sidebar.is-rail .sidebar-signout,
 .sidebar.is-rail .sidebar-rail-toggle {
+  color: #93a4b0;
+  background: none;
+  border: 1px solid transparent;
   border-radius: 10px;
   justify-content: center;
   place-items: center;
@@ -1158,37 +1165,43 @@
   padding: 0;
 }
 
-/* 44px, not 40px. The centres already matched, but a 40px filled badge sitting
-   between 44px squares has its edges 2px inside theirs, and the eye reads the
-   edges, not the centre. */
 .sidebar.is-rail .brand-mark {
-  color: #16222b;
-  background: #eef3f1;
   border-radius: 10px;
   flex: none;
   width: 44px;
   height: 44px;
-  font-size: .8rem;
 }
 
 /* The workspace switcher is a control, not a destination. It was carrying its
    own green, so two different green boxes sat in one column and neither read
    as "you are here". Only the selected nav item is green now. */
-.sidebar.is-rail .workspace-switcher-button {
-  color: #9fb0bb;
-  background: #ffffff0a;
-  border: 1px solid #ffffff14;
+.sidebar.is-rail .nav a:hover,
+.sidebar.is-rail .workspace-switcher-button:hover,
+.sidebar.is-rail .sidebar-signout:hover,
+.sidebar.is-rail .sidebar-rail-toggle:hover {
+  color: #fff;
+  background: #ffffff14;
+  border-color: transparent;
 }
 
-.sidebar.is-rail .workspace-switcher-button:hover {
-  color: #fff;
-  background: #ffffff1a;
+/* The badge is the app mark, not a button. Dark on dark with a hairline, so it
+   identifies the product without being the loudest thing in the column. */
+.sidebar.is-rail .brand-mark {
+  color: #cfe0d8;
+  background: #ffffff0d;
+  border: 1px solid #ffffff1f;
+  font-size: .72rem;
 }
 
 .sidebar.is-rail .workspace-switcher-icon {
+  color: inherit;
   background: none;
   width: auto;
   height: auto;
+}
+
+.sidebar.is-rail .workspace-switcher-icon svg {
+  color: inherit;
 }
 
 /* The sign-out sits in a form inside the tenant card, which was not centring
