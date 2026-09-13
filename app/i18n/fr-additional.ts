@@ -1,4 +1,11 @@
 export const frAdditional: Record<string, string> = {
+  // Geolocation strings from origin/main (PR #1).
+  "Finding your location…": "Recherche de votre position…",
+  "Location unavailable — showing Canada overview": "Position indisponible — aperçu du Canada",
+  "Building geometry / OpenStreetMap": "Géométrie des bâtiments / OpenStreetMap",
+  "Interactive 3D map": "Carte 3D interactive",
+  "Assembling map": "Chargement de la carte",
+  "Map unavailable": "Carte indisponible",
   "See everything about this screen": "Voir tous les détails de cet écran",
   "What you owe": "Ce que vous devez",
   "Your total": "Votre total",

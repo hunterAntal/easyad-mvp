@@ -8,13 +8,34 @@ import { INTRO_COOKIE_MAX_AGE, INTRO_COOKIE_NAME } from "../lib/preferences";
 import { useI18n } from "../i18n/client";
 import { mapLibreLocale } from "../i18n/maplibre";
 
-const torontoCenter: [number, number] = [-79.3832, 43.6532];
+const overviewCenter: [number, number] = [-96, 56];
 
 export default function TorontoStarter({ show, children }: { show: boolean; children: ReactNode }) {
   const { t } = useI18n();
   const [visible, setVisible] = useState(show);
   const [leaving, setLeaving] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [location, setLocation] = useState<[number, number] | null>(null);
+  const [locating, setLocating] = useState(true);
+
+  useEffect(() => {
+    if (!visible) return;
+    let disposed = false;
+    const unavailable = () => { if (!disposed) setLocating(false); };
+    if (!navigator.geolocation) {
+      unavailable();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      if (disposed) return;
+      if (Number.isFinite(coords.longitude) && Number.isFinite(coords.latitude)
+        && Math.abs(coords.longitude) <= 180 && Math.abs(coords.latitude) <= 90) {
+        setLocation([coords.longitude, coords.latitude]);
+      }
+      setLocating(false);
+    }, unavailable, { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 });
+    return () => { disposed = true; };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -34,7 +55,7 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
   if (!visible) return children;
 
   return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label={t("Ad campaign starter")}>
-    <TorontoThreeDimensionalMap />
+    <TorontoThreeDimensionalMap location={location} />
     <div className="toronto-map-wash" aria-hidden="true" />
     <header className="toronto-starter-brand">
       <strong>{t("EasyAD Platform")}</strong>
@@ -58,16 +79,20 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
       </ul>
     </section>
     <footer className="toronto-starter-meta">
-      <span>43.6532 N / 79.3832 W</span>
-      <span>{t("Toronto building geometry / OpenStreetMap")}</span>
+      <span role="status">{location
+        ? `${Math.abs(location[1]).toFixed(4)} ${location[1] < 0 ? "S" : "N"} / ${Math.abs(location[0]).toFixed(4)} ${location[0] < 0 ? "W" : "E"}`
+        : t(locating ? "Finding your location…" : "Location unavailable — showing Canada overview")}</span>
+      <span>{t("Building geometry / OpenStreetMap")}</span>
     </footer>
   </main>;
 }
 
-function TorontoThreeDimensionalMap() {
+function TorontoThreeDimensionalMap({ location }: { location: [number, number] | null }) {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const locationRef = useRef(location);
+  locationRef.current = location;
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -77,8 +102,8 @@ function TorontoThreeDimensionalMap() {
       map = new maplibregl.Map({
         container: containerRef.current,
         style: "https://tiles.openfreemap.org/styles/liberty",
-        center: torontoCenter,
-        zoom: 14.7,
+        center: locationRef.current ?? overviewCenter,
+        zoom: locationRef.current ? 14.7 : 3,
         pitch: 62,
         bearing: -28,
         canvasContextAttributes: { antialias: true },
@@ -96,7 +121,9 @@ function TorontoThreeDimensionalMap() {
     map.on("load", () => {
       styleTorontoBuildings(map);
       setStatus("ready");
-      map.easeTo({ center: [-79.3821, 43.6509], zoom: 15.55, pitch: 68, bearing: -15, duration: 5200, essential: true });
+      if (locationRef.current) {
+        map.easeTo({ center: locationRef.current, zoom: 15.55, pitch: 68, bearing: -15, duration: 1800 });
+      }
     });
     map.on("error", () => {
       if (!map.isStyleLoaded()) setStatus("error");
@@ -108,10 +135,16 @@ function TorontoThreeDimensionalMap() {
     };
   }, [locale]);
 
+  useEffect(() => {
+    if (location && mapRef.current?.isStyleLoaded()) {
+      mapRef.current.easeTo({ center: location, zoom: 15.55, pitch: 68, bearing: -15, duration: 1800 });
+    }
+  }, [location]);
+
   return <div className={`toronto-map status-${status}`}>
-    <div ref={containerRef} className="toronto-map-canvas" role="application" aria-label={t("Interactive 3D map of downtown Toronto")} />
-    {status === "loading" ? <div className="toronto-map-loader"><i /><span>{t("Assembling Toronto")}</span></div> : null}
-    {status === "error" ? <div className="toronto-map-fallback"><span>Toronto</span><small>{t("Interactive map data needs an internet connection.")}</small></div> : null}
+    <div ref={containerRef} className="toronto-map-canvas" role="application" aria-label={t("Interactive 3D map")} />
+    {status === "loading" ? <div className="toronto-map-loader"><i /><span>{t("Assembling map")}</span></div> : null}
+    {status === "error" ? <div className="toronto-map-fallback"><span>{t("Map unavailable")}</span><small>{t("Interactive map data needs an internet connection.")}</small></div> : null}
   </div>;
 }
 
