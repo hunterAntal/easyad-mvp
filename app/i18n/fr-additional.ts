@@ -1,4 +1,10 @@
 export const frAdditional: Record<string, string> = {
+  "Finding your location…": "Recherche de votre position…",
+  "Location unavailable — showing Canada overview": "Position indisponible — aperçu du Canada",
+  "Building geometry / OpenStreetMap": "Géométrie des bâtiments / OpenStreetMap",
+  "Interactive 3D map": "Carte 3D interactive",
+  "Assembling map": "Chargement de la carte",
+  "Map unavailable": "Carte indisponible",
   "Outdoor Campaign Buying Portal": "Portail d’achat de campagnes extérieures",
   "Digital Screen": "Écran numérique",
   "Transit Panel": "Panneau de transport",
