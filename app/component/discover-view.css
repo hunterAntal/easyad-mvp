@@ -177,7 +177,7 @@
    column has room to spare, so the detail sits under the filters and the map
    and list grow through both rows. */
 .discover-grid {
-  grid-template-columns: 300px minmax(480px,1fr) 326px;
+  grid-template-columns: 336px minmax(440px,1fr) 326px;
   grid-template-areas: "filters map list""detail map list";
   grid-template-rows: auto minmax(0,1fr);
   gap: 12px;
@@ -334,4 +334,20 @@
 
 .detail-profile-link:hover {
   text-decoration: underline;
+}
+
+/* The detail tiles sit in a narrow column, so they carry less padding than a
+   full-width tile and their values step down a size. "Digital Screen" wrapped
+   to two lines inside a tile sized for one. */
+.discover-grid .detail-panel .detail-grid .metric {
+  min-height: 78px;
+  padding: 10px 8px;
+}
+
+.discover-grid .detail-panel .detail-grid .metric strong {
+  font-size: 1.02rem;
+}
+
+.discover-grid .detail-panel .detail-grid {
+  gap: 8px;
 }

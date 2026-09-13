@@ -712,43 +712,20 @@
   display: grid;
 }
 
-/* Two of the four labels wrap to a second line and two do not, so the numbers
-   sat at four different heights. The label sits at the top, the number is
-   pushed to the bottom, and the grid gives every tile the same height, so the
-   numbers share one baseline whatever the label does. */
+/* Label treatment lives in .stat-tiles in shared-ui.css. Only the size and the
+   equal tile height belong to this screen; equal height is what puts the four
+   numbers on one baseline when two labels wrap and two do not. */
 .advertiser-home-copy .portal-stats .metric {
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  text-align: center;
-  gap: 10px;
   min-height: 92px;
   padding: 14px 12px;
-  display: flex;
 }
 
-/* The label was weight 400 in --muted against a weight 800 number, so it read
-   as an afterthought. It now uses the product's canonical eyebrow treatment
-   (uppercase, .08em tracking, weight 800) from .eyebrow in shared-ui.css, one
-   step darker for presence. DESIGN.md sets sentence case for labels and makes
-   short uppercase eyebrows the exception; a stat-tile label is that exception,
-   and it is the same treatment the panel headings already use. */
 .advertiser-home-copy .portal-stats .metric span {
-  color: #46515a;
-  text-transform: uppercase;
-  text-wrap: balance;
-  letter-spacing: .08em;
   max-width: 16ch;
-  font-size: .68rem;
-  font-weight: 800;
-  line-height: 1.35;
 }
 
 .advertiser-home-copy .portal-stats .metric strong {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.01em;
   font-size: 1.55rem;
-  line-height: 1;
 }
 
 .advertiser-home-band {

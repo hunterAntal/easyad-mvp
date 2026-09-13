@@ -85,6 +85,36 @@
   font-size: .78rem;
 }
 
+/* Stat tiles: the label names the figure, so it carries the product's canonical
+   eyebrow weight rather than sitting at 400 beside an 800 number. Opt in with
+   .stat-tiles on the container. Applied on the advertiser home and the Discover
+   detail panel; one rule, no duplication. */
+.stat-tiles .metric {
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  display: flex;
+}
+
+.stat-tiles .metric span {
+  color: #46515a;
+  text-transform: uppercase;
+  text-wrap: balance;
+  letter-spacing: .07em;
+  font-size: .66rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.stat-tiles .metric strong {
+  font-variant-numeric: tabular-nums;
+  text-wrap: balance;
+  letter-spacing: -.01em;
+  line-height: 1.1;
+}
+
 .grid {
   align-items: start;
   gap: 16px;

@@ -107,7 +107,7 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
   return (
     <>
       <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Book")}</button>} />
-      <div className="detail-grid">
+      <div className="detail-grid stat-tiles">
         <Metric label="Format" value={t(spec.label)} />
         <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />
         <Metric label="Impressions" value={formatNumber(item.impressions)} />
