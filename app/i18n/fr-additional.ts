@@ -1,4 +1,6 @@
 export const frAdditional: Record<string, string> = {
+  "Collapse menu": "Réduire le menu",
+  "Expand menu": "Agrandir le menu",
   "Distance": "Distance",
   "Within {count} km": "Dans un rayon de {count} km",
   "Most per day": "Maximum par jour",

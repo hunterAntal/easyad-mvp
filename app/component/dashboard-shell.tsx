@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Booking, InventoryItem, Role, View } from "../data";
 import { roleLabel, roleValues, roleWorkspaceView } from "../roles";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { money, portalHref } from "../utils";
 import { Brand } from "./shared-ui";
 import type { DbUser } from "../lib/db";
@@ -134,7 +135,7 @@ const governmentNav: NavItem[] = [
 
 type AppSurface = "marketplace" | "government";
 
-export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace" }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface }) {
+export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void }) {
   const { t } = useI18n();
   const roleOptions = currentUser?.role === "admin" ? [...roleValues] : currentUser ? [currentUser.role] : [...roleValues];
   const displayRole = roleLabel(role);
@@ -143,7 +144,19 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
   const navigation = isGovernment ? governmentNav : roleNav[role];
 
   return (
-    <aside className={`sidebar${isGovernment ? " government-sidebar" : ""}`}>
+    <aside className={`sidebar${isGovernment ? " government-sidebar" : ""}${collapsed ? " is-rail" : ""}`}>
+      {onToggleCollapsed ? (
+        <button
+          aria-expanded={!collapsed}
+          aria-label={t(collapsed ? "Expand menu" : "Collapse menu")}
+          className="sidebar-rail-toggle"
+          onClick={onToggleCollapsed}
+          title={t(collapsed ? "Expand menu" : "Collapse menu")}
+          type="button"
+        >
+          {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+        </button>
+      ) : null}
       {isGovernment ? <GovernmentBrand /> : <Brand subtitle="Media operations" />}
       {isGovernment ? (
         <div className="government-scope-card">
@@ -167,7 +180,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
                   onClick={isGovernment ? undefined : (event) => { event.preventDefault(); setView(navView); }}
                 >
                   <Icon aria-hidden="true" />
-                  <span>{t(label)}</span>
+                  <span className="nav-label">{t(label)}</span>
                   {view === navView ? <span className="nav-active-mark" /> : null}
                 </a>
               ))}
