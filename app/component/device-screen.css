@@ -52,6 +52,10 @@
   background: #050708;
   height: 100vh;
   min-height: 100vh;
+  /* dvh where supported: on a phone-sized screen with browser toolbars, vh is
+     taller than the visible area and the bottom of the template was cut off. */
+  height: 100dvh;
+  min-height: 100dvh;
   display: grid;
   position: relative;
   overflow: hidden;

@@ -566,8 +566,11 @@
 
 @media (max-width:1180px) {
 
+/* One column inside a min-height of the window: without align-content the two
+   rows shared the spare height, which opened a gap between copy and map. */
 .portal-hero {
   grid-template-columns: 1fr;
+  align-content: center;
   padding-top: 34px;
 }
 
@@ -752,6 +755,15 @@
 
 .advertiser-home-head .portal-map-wrap .city-map {
   height: 470px;
+}
+
+/* This rule is more specific than the phone rule that sets 360px, so the home
+   map stayed 470px tall on a phone. */
+@media (max-width:640px) {
+
+.advertiser-home-head .portal-map-wrap .city-map {
+  height: 360px;
+}
 }
 
 .advertiser-steps {

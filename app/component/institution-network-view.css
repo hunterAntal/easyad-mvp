@@ -78,7 +78,9 @@
 }
 
 .network-map-stage .city-map { height: 500px; }
-.network-map-stage .map-legend span:last-child { display: none; }
+/* Only the zoom guidance. "span:last-child" also hid "Selected device" whenever
+   pins were visible, while a green selected pin was on the map. */
+.network-map-stage .map-legend .map-zoom-guidance { display: none; }
 
 .network-device-strip {
   grid-template-columns: repeat(auto-fit,minmax(170px,1fr));
@@ -222,7 +224,7 @@
 .emergency-form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; display: grid; }
 .emergency-form-grid .span-2 { grid-column: 1/-1; }
 .emergency-form-grid select,
-.emergency-form-grid textarea { border: 1px solid var(--line); width: 100%; color: var(--ink); background: #fff; border-radius: var(--radius-sm); padding: 0 11px; }
+.emergency-form-grid textarea { font: inherit; border: 1px solid var(--line); width: 100%; color: var(--ink); background: #fff; border-radius: var(--radius-sm); padding: 0 11px; }
 .emergency-form-grid select { min-height: 40px; }
 .emergency-form-grid textarea { min-height: 116px; padding-top: 10px; resize: none; }
 .emergency-form-grid select:hover,
