@@ -143,7 +143,11 @@ Public surfaces use 9–12px radii. Dense workspace controls use 6px and panels 
 
 ### Foundational visual states
 
-Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Every state includes a distinct icon shape and a text label; colour alone never encodes a state. A browse surface carries the figures a person decides on. Deeper attributes belong on the item's own profile, reachable by a link, so detail is deferred without capability being removed.
+Every interactive component defines default, hover, focus-visible, active, disabled, and busy states without changing its footprint. Selection combines border, surface, and text/icon cues. Loading uses the app-owned spinner or stable pending copy; skeletons are not a default. Every state includes a distinct icon shape and a text label; colour alone never encodes a state. A map search screen uses two columns, not three. Filters sit in one horizontal bar across the top, the map holds the main column, and the result list holds the second. The detail for a selected item floats over the map's bottom corner, beside the pin it describes, rather than taking a column or a row of its own. Below 1120px the columns stack and the detail returns to normal flow, because a card floating over a narrow map would cover it.
+
+A step indicator names the steps and marks the current one. It never states a count the product cannot keep. A step that cannot be reached yet states the reason instead of leading to an empty screen.
+
+A browse surface carries the figures a person decides on. Deeper attributes belong on the item's own profile, reachable by a link, so detail is deferred without capability being removed.
 
 A scanning list carries only what a person scans by. Per-item attributes belong in the detail surface for the selected item, not repeated on every row.
 

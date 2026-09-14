@@ -147,6 +147,10 @@ No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/
 
 Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
 
+Discover uses two columns. The filters are one horizontal bar above the map and the result list. The selected screen's detail floats over the map. `.discover-grid` in [`app/component/discover-view.css`](app/component/discover-view.css) is declared twice; the lower rule wins on source order and holds the layout. Keep the column count in every media query equal to the column count in `grid-template-areas`, or a phantom track appears and the map collapses.
+
+The advertiser buying flow shows a three-step indicator in the top bar: Find screens, Book dates, Make an ad. Booking already takes the ad picture, so a person can buy screen time in two steps. Make an ad is a separate task for a campaign that is already booked, and it stays locked until one exists.
+
 Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
 
 Every empty state names a next action, through the shared `EmptyState` in [`app/component/shared-ui.tsx`](app/component/shared-ui.tsx). A column header is never shown above an empty table.

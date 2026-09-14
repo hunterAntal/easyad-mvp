@@ -37,8 +37,8 @@ export default function DiscoverView(props: {
   return (
     <section className="grid discover-grid">
       <div className="panel filters-panel">
-        <PanelHeading eyebrow="Filters" title="Narrow your search" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
         <FiltersPanel {...props} />
+        <button className="ghost-button filters-reset" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>
       </div>
       <div className="map-stage">
         <MapLibreInventoryMap
@@ -119,12 +119,18 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
           decides a booking on. The full profile still carries every one of
           them, so this defers detail without removing capability. */}
       <a className="detail-profile-link" href={`/inventory/${item.id}`}>{t("See everything about this screen")}</a>
-      <div className="spec-box">
-        <strong>{t("Creative spec")}</strong>
-        <span>{t(spec.spec)}</span>
-        <span>{t("Aspect ratio {ratio} with {percent}% safe zone.", { ratio: formatRatio(spec.ratio), percent: spec.safeZone })}</span>
-      </div>
-      {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      {/* The card floats over the map, so only the figures a person decides on
+          stay open. The production spec and the tags are not carried by the
+          profile page, so they are collapsed here rather than removed. */}
+      <details className="detail-more">
+        <summary>{t("Size, file types and tags")}</summary>
+        <div className="spec-box">
+          <strong>{t("Creative spec")}</strong>
+          <span>{t(spec.spec)}</span>
+          <span>{t("Aspect ratio {ratio} with {percent}% safe zone.", { ratio: formatRatio(spec.ratio), percent: spec.safeZone })}</span>
+        </div>
+        {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      </details>
       <div className="timeline">
         {campaigns.length ? campaigns.map((booking) => (
           <div key={booking.id}>
