@@ -24,6 +24,13 @@ export const mapBounds = {
   south: 10,
 };
 
+// In-app links keep a real href and switch the view client-side on a plain
+// left click only. A modified click (Cmd, Ctrl, Shift, Alt) or a middle click
+// is left to the browser, so "open in new tab" still works.
+export function isPlainLeftClick(event: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean }) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !event.defaultPrevented;
+}
+
 export function portalHref(role: Role, view: View) {
   return `/?role=${role}&view=${view}`;
 }

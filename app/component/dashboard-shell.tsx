@@ -30,7 +30,7 @@ import {
 import { Booking, InventoryItem, Role, View } from "../data";
 import { roleLabel, roleValues, roleWorkspaceView } from "../roles";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { money, portalHref } from "../utils";
+import { isPlainLeftClick, money, portalHref } from "../utils";
 import { Brand } from "./shared-ui";
 import type { DbUser } from "../lib/db";
 import { LanguageSelector, useI18n } from "../i18n/client";
@@ -158,7 +158,7 @@ function BuyingSteps({ view, hasBookings, onSelect }: { view: View; hasBookings:
               <a
                 aria-current={isCurrent ? "step" : undefined}
                 href={portalHref("advertiser", step.view)}
-                onClick={(event) => { event.preventDefault(); onSelect(step.view); }}
+                onClick={(event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); onSelect(step.view); }}
               >{body}</a>
             )}
           </li>
@@ -224,7 +224,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
                   key={navView}
                   href={isGovernment ? `/government?view=${navView}` : portalHref(role, navView)}
                   className={view === navView ? "active" : ""}
-                  onClick={isGovernment ? undefined : (event) => { event.preventDefault(); setView(navView); }}
+                  onClick={isGovernment ? undefined : (event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); setView(navView); }}
                 >
                   <Icon aria-hidden="true" />
                   <span className="nav-label">{t(label)}</span>

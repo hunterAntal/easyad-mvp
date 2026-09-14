@@ -2,7 +2,7 @@
 
 import "./shared-ui.css";
 import { Booking, InventoryItem } from "../data";
-import { money } from "../utils";
+import { isPlainLeftClick, money } from "../utils";
 import { useI18n } from "../i18n/client";
 
 export function PanelHeading({ eyebrow, title, action }: { eyebrow: string; title: string; action?: React.ReactNode }) {
@@ -27,7 +27,9 @@ export function NavLinkButton({
   onClick: () => void;
 }) {
   return (
-    <a className={className} href={href} onClick={() => onClick()}>
+    // Without preventDefault the view switched and then the browser also loaded
+    // the whole page: a flash, a restarted map, and lost local state.
+    <a className={className} href={href} onClick={(event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); onClick(); }}>
       {children}
     </a>
   );

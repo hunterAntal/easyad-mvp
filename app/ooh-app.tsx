@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isRoleValue, isViewValue } from "./roles";
 import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, locations } from "./data";
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
@@ -92,6 +93,39 @@ export default function OohApp({
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
   const [role, setRole] = useState<Role>(startingRole);
   const [view, setView] = useState<View>(initialView);
+
+  // The address follows the view. It used to stay on the first page loaded, so
+  // reload went back to that page, Back left the app, and a copied link opened
+  // the wrong view. The ref holds what the address already says: the server
+  // made it match on load, and Back updates it before changing the view, so
+  // neither a double-run effect nor a Back press pushes an extra entry.
+  const addressState = useRef({ role, view });
+  useEffect(() => {
+    if (addressState.current.role === role && addressState.current.view === view) return;
+    addressState.current = { role, view };
+    const url = new URL(window.location.href);
+    if (surface === "government") url.searchParams.delete("role");
+    else url.searchParams.set("role", role);
+    url.searchParams.set("view", view);
+    if (url.href !== window.location.href) window.history.pushState(window.history.state, "", url);
+  }, [role, surface, view]);
+
+  // Back and Forward restore the view, and the role where it can change.
+  useEffect(() => {
+    function restoreFromAddress() {
+      const params = new URLSearchParams(window.location.search);
+      const requestedView = params.get("view");
+      const requestedRole = params.get("role");
+      const nextView = isViewValue(requestedView) ? requestedView : initialView;
+      const canChangeRole = surface !== "government" && (!currentUser || currentUser.role === "admin");
+      const nextRole = canChangeRole && isRoleValue(requestedRole) ? requestedRole : startingRole;
+      addressState.current = { role: nextRole, view: nextView };
+      setRole(nextRole);
+      setView(nextView);
+    }
+    window.addEventListener("popstate", restoreFromAddress);
+    return () => window.removeEventListener("popstate", restoreFromAddress);
+  }, [currentUser, initialView, startingRole, surface]);
   const [selectedLocationId, setSelectedLocationId] = useState(
     initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
   );
