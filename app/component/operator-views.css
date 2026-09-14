@@ -99,9 +99,36 @@
   overflow: hidden;
 }
 
+/* Seven unlabelled cells cannot stack into one column without losing their
+   meaning, so this table scrolls sideways and keeps its header at every width.
+   The tracks were plain fr with an automatic minimum, so each row sized its
+   columns to its own content: the rows went past the panel, did not line up,
+   and in French scrolled the whole page sideways at 901-936px. Below 900px the
+   shared rule hid the header while this more specific rule kept seven columns.
+   minmax(0, ...) aligns every row; the minimum width gives the scroll. */
+.inventory-management-table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 .inventory-management-table .table-head,
 .inventory-management-table .table-row {
-  grid-template-columns: 1.2fr .85fr .85fr .72fr .75fr .9fr .9fr;
+  grid-template-columns: minmax(0,1.2fr) minmax(0,.85fr) minmax(0,.85fr) minmax(0,.72fr) minmax(0,.75fr) minmax(0,.9fr) minmax(0,.9fr);
+  min-width: 760px;
+}
+
+/* With minmax(0, ...) a cell no longer grows, so a long pill such as
+   "Delivery mode pending" spilled into the Rate column. Cells shrink and
+   pills wrap inside their own column. */
+.inventory-management-table .table-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inventory-management-table .status {
+  white-space: normal;
+  max-width: 100%;
 }
 
 .calendar {
@@ -232,7 +259,9 @@
   display: flex;
 }
 
+/* Wraps: in French "Enregistrer les modifications" ran past the panel. */
 .inventory-draft-actions {
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   display: flex;
@@ -288,12 +317,26 @@
   background: #f8faf9;
 }
 
+/* The record panel was a fixed 360px column down to 901px. With the full
+   sidebar at 901-960px that left it 233px wide and cut off "Save changes".
+   Below 1241px the record form takes the full width under the table. */
+@media (max-width:1240px) {
+
+.inventory-grid {
+  grid-template-columns: 1fr;
+}
+}
+
 @media (max-width:900px) {
 
 .inventory-grid,
 .approvals-grid {
   grid-template-columns: 1fr;
   grid-template-areas: none;
+}
+
+.inventory-management-table .table-head {
+  display: grid;
 }
 
 .approval-card,
