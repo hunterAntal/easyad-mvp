@@ -1288,7 +1288,7 @@
    aria-current="step", and a step that cannot be reached yet says why instead
    of leading to an empty screen. */
 .buying-steps {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   margin: 10px 0 0;
@@ -1300,6 +1300,72 @@
 .buying-step {
   align-items: center;
   display: flex;
+}
+
+/* The steps never wrap. A wrapped row left "Make an ad" alone on a second line
+   with its connector dash in front of it. The title column used to shrink to
+   whatever the tools left over, which squeezed the steps between 1121px and
+   about 1410px with the full sidebar.
+
+   Topbar renders a different structure when the steps show: the title and the
+   stats share .topbar-main, and the language menu sits beside it. The title
+   keeps the width the steps need, the stats drop below the steps when both
+   cannot fit, and the language menu stays top-right. This is intrinsic rather
+   than a breakpoint, so it holds for the collapsed rail, the full sidebar, and
+   longer French labels alike. It also stays a row below 1121px, where other
+   topbars stack into a column. */
+.topbar.has-buying-steps {
+  flex-flow: row wrap;
+  align-items: flex-start;
+}
+
+/* Basis 0 with the automatic minimum width: the language menu stays on the
+   first row until the title itself cannot fit beside it, on a phone. */
+.topbar-main {
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px 18px;
+  display: flex;
+}
+
+.topbar-main .topbar-title {
+  flex-shrink: 0;
+}
+
+.topbar-main .metrics {
+  flex: 0 1 540px;
+}
+
+.topbar.has-buying-steps .topbar-tools {
+  flex: none;
+  width: auto;
+  margin-left: auto;
+}
+
+/* On a phone the stats never share a row with the title, and inside
+   .topbar-main they were squeezed beside the language menu into about 250px.
+   Release the wrapper so the title and the language menu share the first row
+   and the stats take the whole second row. */
+@media (max-width: 560px) {
+  .topbar.has-buying-steps .topbar-main {
+    display: contents;
+  }
+
+  .topbar.has-buying-steps .topbar-title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .topbar.has-buying-steps .topbar-tools {
+    order: 1;
+  }
+
+  .topbar.has-buying-steps .metrics {
+    flex: 1 1 100%;
+    order: 2;
+  }
 }
 
 .buying-step + .buying-step::before {

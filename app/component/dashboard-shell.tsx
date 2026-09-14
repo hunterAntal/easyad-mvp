@@ -334,24 +334,47 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, setView,
   const isGovernment = surface === "government";
   const isAdvertiser = role === "advertiser" && !isGovernment;
   const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
+  const showSteps = isAdvertiser && buyingSteps.some((step) => step.view === view);
+  const titleBlock = (
+    <div className="topbar-title">
+      <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
+      <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
+      {showSteps && setView ? <BuyingSteps view={view} hasBookings={bookings.length > 0} onSelect={setView} /> : null}
+    </div>
+  );
+  const metrics = view !== "network" ? (
+    <div className="metrics" aria-label={t("Workspace summary")}>
+      <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
+      {/* Occupancy is a yield metric for the person selling the screen. It
+          means nothing to the person buying one, so the buyer does not see it. */}
+      {isAdvertiser ? null : <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>}
+      <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t(isAdvertiser ? "Your spend so far" : "Booked value")}</small></div>
+    </div>
+  ) : null;
+
+  // With the buying steps, the title and the stats share one wrapping row, so
+  // the stats drop below the steps when space runs out. The language menu sits
+  // outside that row and stays top-right beside the title.
+  if (showSteps && setView) {
+    return (
+      <header className="topbar has-buying-steps">
+        <div className="topbar-main">
+          {titleBlock}
+          {metrics}
+        </div>
+        <div className="topbar-tools">
+          <LanguageSelector placement="embedded" />
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className={`topbar${isGovernment ? " government-topbar" : ""}`}>
-      <div className="topbar-title">
-        <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
-        <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
-        {isAdvertiser && buyingSteps.some((step) => step.view === view) && setView
-          ? <BuyingSteps view={view} hasBookings={bookings.length > 0} onSelect={setView} />
-          : null}
-      </div>
+      {titleBlock}
       {isGovernment && view === "network" ? <div className="government-session-status"><span /><div><strong>{t("Institution systems")}</strong><small>{t("Authenticated operating session")}</small></div></div> : null}
       <div className="topbar-tools">
-        {view !== "network" ? <div className="metrics" aria-label={t("Workspace summary")}>
-          <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
-          {/* Occupancy is a yield metric for the person selling the screen. It
-              means nothing to the person buying one, so the buyer does not see it. */}
-          {isAdvertiser ? null : <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>}
-          <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t(isAdvertiser ? "Your spend so far" : "Booked value")}</small></div>
-        </div> : null}
+        {metrics}
         <LanguageSelector placement="embedded" />
       </div>
     </header>
