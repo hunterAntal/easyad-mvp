@@ -809,7 +809,16 @@ function createInventoryMarkers(
     if (selectionEnabled) element.setAttribute("aria-pressed", String(selected));
     element.append(createDevicePinGlyphElement());
 
-    element.addEventListener("click", (event) => { event.preventDefault(); onSelect?.(item.id); onMarkerOpen?.(item.id); });
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      // Enter on a focused pin fires keypress, which MapLibre handles by opening
+      // the popup and moving focus into it, and then this button's own click.
+      // That click bubbled to the map, which toggled the popup shut and left
+      // focus on the page body. A keyboard click (detail 0) stops at the pin.
+      if (event.detail === 0) event.stopPropagation();
+      onSelect?.(item.id);
+      onMarkerOpen?.(item.id);
+    });
 
     return new maplibregl.Marker({ element, anchor: "bottom", subpixelPositioning: true })
       .setLngLat(percentToLngLat(item))
