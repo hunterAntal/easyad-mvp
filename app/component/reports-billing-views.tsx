@@ -73,7 +73,7 @@ export function ReportsView({
           title="Delivery logs"
           action={<AsyncButton className="ghost-button" disabled={!canRunDelivery} onClick={onRunDelivery} successMessage="Demo delivery tick recorded across active campaigns." errorMessage="Could not record demo delivery. Please try again.">{canRunDelivery ? "Demo: Run delivery tick" : "Operator only"}</AsyncButton>}
         />
-        <div className="pop-list">{bookings.map((booking) => <div key={booking.id}><strong>{booking.id}</strong><span>{booking.campaign}</span><meter min={0} max={100} value={booking.pop} /><small>{t("{percent}% verified - {amount} collected platform-wide", { percent: booking.pop, amount: money(collected, locale) })}</small></div>)}</div>
+        {bookings.length ? null : <p className="report-empty-note">{t("No delivery logged yet.")}</p>}<div className="pop-list">{bookings.map((booking) => <div key={booking.id}><strong>{booking.id}</strong><span>{booking.campaign}</span><meter min={0} max={100} value={booking.pop} /><small>{t("{percent}% verified - {amount} collected platform-wide", { percent: booking.pop, amount: money(collected, locale) })}</small></div>)}</div>
       </div>
       ) : null}
       <div className="panel span-2"><PanelHeading eyebrow="Campaigns" title={isAdvertiser ? "Every ad you have run" : "Reporting table"} /><BookingsTable bookings={bookings} inventory={inventory} /></div>
@@ -133,6 +133,7 @@ export function BillingView({
         </div>
         {/* The tiles above hide the platform share and operator payable from a
             buyer on purpose. The table showed both anyway, per invoice. */}
+        {rows.length ? null : <p className="report-empty-note">{t("No invoices yet.")}</p>}
         <div className={`inventory-table billing-table${isAdvertiser ? " is-advertiser" : ""}`}>
           {rows.length ? <div className="table-head"><span>{t("Reference")}</span><span>{t("Advertiser")}</span><span>{t(isAdvertiser ? "Amount" : "Gross")}</span>{isAdvertiser ? null : <><span>{t("Platform")}</span><span>{t("Operator")}</span></>}<span>{t("Gateway")}</span><span>{t("Status")}</span></div> : null}
           {rows.map(({ booking, amount, platformFee, operatorPayout, status, gatewayRef }) => {

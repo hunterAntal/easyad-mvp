@@ -35,10 +35,18 @@
 }
 }
 
+/* auto-fit: an advertiser has two tiles and repeat(3) left a blank column.
+   The margin keeps the tiles off the empty state or table below them. */
 .report-metrics {
-  grid-template-columns: repeat(3,minmax(120px,1fr));
+  grid-template-columns: repeat(auto-fit,minmax(120px,1fr));
   gap: 10px;
+  margin-bottom: 14px;
   display: grid;
+}
+
+.report-empty-note {
+  color: var(--muted);
+  margin: 4px 0 0;
 }
 
 .billing-grid {
@@ -88,8 +96,11 @@
   border-color: #b7d2c7;
 }
 
+/* This later rule is the one that applies above 900px. auto-fit: with four
+   columns an advertiser's two tiles filled half the row and left the rest
+   blank. */
 .report-metrics {
-  grid-template-columns: repeat(4,minmax(130px,1fr));
+  grid-template-columns: repeat(auto-fit,minmax(130px,1fr));
 }
 
 .bar-chart {
