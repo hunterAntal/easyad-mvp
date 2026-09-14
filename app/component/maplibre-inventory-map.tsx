@@ -622,12 +622,21 @@ type LngLat = {
   lat: number;
 };
 
+// Positions are rounded to a tenth of a pixel. A raw value such as
+// 324.5875199999937 is written into the server HTML, the browser shortens the
+// inline style to six significant digits ("324.588px"), and React then sees the
+// client's full-precision number as a different value and reports a hydration
+// mismatch. A tenth of a pixel survives that shortening unchanged.
+function roundPx(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
 function markerStyle(point: MapPoint, viewportOrigin: { x: number; y: number }, zoom: number) {
   const [lng, lat] = percentToLngLat(point);
   const world = lngLatToWorld(lng, lat, zoom);
   return {
-    left: world.x - viewportOrigin.x,
-    top: world.y - viewportOrigin.y,
+    left: roundPx(world.x - viewportOrigin.x),
+    top: roundPx(world.y - viewportOrigin.y),
   };
 }
 
@@ -647,8 +656,8 @@ function getVisibleTiles(viewportOrigin: { x: number; y: number }, size: { width
         y,
         z: zoom,
         urlX,
-        left: x * tileSize - viewportOrigin.x,
-        top: y * tileSize - viewportOrigin.y,
+        left: roundPx(x * tileSize - viewportOrigin.x),
+        top: roundPx(y * tileSize - viewportOrigin.y),
       });
     }
   }

@@ -1057,6 +1057,14 @@
   height: 16px;
 }
 
+/* The rail applies only where the sidebar is a column. It was unscoped, and a
+   max-width:1180px block forced the shell to one column on the false belief
+   that the sidebar is already a top bar there. It is not: it stays a 244px
+   column down to 901px and becomes a bar at 900px. Between those widths the
+   collapsed rail stretched to the full screen, pushed the workspace below the
+   fold, and the same block hid the only control that could undo it. */
+@media (min-width: 901px) {
+
 .shell.is-rail {
   grid-template-columns: 76px minmax(0, 1fr);
 }
@@ -1257,16 +1265,11 @@
   background: none;
 }
 
-@media (max-width: 1180px) {
-  /* The sidebar is already a horizontal bar here, so the rail does not apply. */
-  .shell.is-rail {
-    grid-template-columns: 1fr;
-  }
+}
 
-  .sidebar.is-rail {
-    padding: 12px 16px;
-  }
-
+/* At 900px and below the sidebar is a top bar and the rail does not exist, so
+   the control that toggles it is not shown. */
+@media (max-width: 900px) {
   .sidebar-rail-toggle {
     display: none;
   }
