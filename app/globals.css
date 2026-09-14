@@ -303,14 +303,17 @@ label {
   display: grid;
 }
 
+/* The scale property, not transform. As transform this rule (0,2,1) replaced
+   the translateY(-50%) that centres the carousel arrows and the fallback map
+   markers, so a pressed arrow dropped 23-32px and the click could be lost. */
 button:not(:disabled):active {
-  transform: scale(.97);
+  scale: .97;
 }
 
 @media (prefers-reduced-motion:reduce) {
 
 button:not(:disabled):active {
-  transform: none;
+  scale: none;
 }
 }
 
