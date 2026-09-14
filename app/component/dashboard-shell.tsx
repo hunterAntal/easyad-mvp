@@ -232,6 +232,9 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
                   key={navView}
                   href={isGovernment ? `/government?view=${navView}` : portalHref(role, navView)}
                   className={view === navView ? "active" : ""}
+                  // The rail shows bare icons; the clipped label still names the
+                  // link for a screen reader, and this names it for the pointer.
+                  title={collapsed ? t(label) : undefined}
                   onClick={isGovernment ? undefined : (event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); setView(navView); }}
                 >
                   <Icon aria-hidden="true" />
@@ -247,8 +250,9 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
       <div className="tenant-card">
         <div className="tenant-avatar" aria-hidden="true">{userName.slice(0, 2).toUpperCase()}</div>
         <div className="tenant-identity">
-          <strong>{userName}</strong>
-          <small>{currentUser ? `${currentUser.email} - ${t(roleLabel(currentUser.role))}` : t("Sign in to save changes")}</small>
+          {/* Both lines truncate with an ellipsis at every sidebar width. */}
+          <strong title={userName}>{userName}</strong>
+          <small title={currentUser?.email}>{currentUser ? `${currentUser.email} - ${t(roleLabel(currentUser.role))}` : t("Sign in to save changes")}</small>
           <span className="tenant-role"><span />{currentUser ? t(displayRole) : t("Demo workspace")}</span>
         </div>
         {currentUser ? (
@@ -289,6 +293,22 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // A listbox is expected to move with the arrow keys and to hand focus back to
+  // its button on Escape. Neither worked: Escape closed the menu and left focus
+  // on an option that no longer existed.
+  function focusOption(step: 1 | -1 | "first" | "last") {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    if (!items.length) return;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = step === "first" ? 0
+      : step === "last" ? items.length - 1
+      : current < 0 ? (step > 0 ? 0 : items.length - 1)
+      : (current + step + items.length) % items.length;
+    items[next]?.focus();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -296,7 +316,9 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
     }
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     document.addEventListener("keydown", closeOnEscape);
@@ -308,13 +330,38 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
 
   return (
     <div className={`workspace-switcher${open ? " is-open" : ""}`} ref={rootRef}>
-      <button aria-expanded={open} aria-haspopup="listbox" aria-label={t("Workspace")} className="workspace-switcher-button" onClick={() => setOpen((current) => !current)} type="button">
+      <button
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={t("Workspace")}
+        className="workspace-switcher-button"
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          setOpen(true);
+          window.requestAnimationFrame(() => focusOption(event.key === "ArrowDown" ? "first" : "last"));
+        }}
+        ref={buttonRef}
+        type="button"
+      >
         <span className="workspace-switcher-icon"><LayoutDashboard aria-hidden="true" /></span>
         <span className="workspace-switcher-copy"><small>{t("Active workspace")}</small><strong>{t(roleLabel(role))}</strong></span>
         <ChevronDown className="workspace-switcher-chevron" aria-hidden="true" />
       </button>
       {open ? (
-        <div aria-label={t("Available workspaces")} className="workspace-menu" role="listbox">
+        <div
+          aria-label={t("Available workspaces")}
+          className="workspace-menu"
+          onKeyDown={(event) => {
+            const steps: Record<string, 1 | -1 | "first" | "last"> = { ArrowDown: 1, ArrowUp: -1, Home: "first", End: "last" };
+            if (!(event.key in steps)) return;
+            event.preventDefault();
+            focusOption(steps[event.key]);
+          }}
+          ref={menuRef}
+          role="listbox"
+        >
           {options.map((option) => (
             <button
               aria-label={t(roleLabel(option))}

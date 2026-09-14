@@ -79,6 +79,20 @@ export function LanguageSelector({ placement = "floating" }: { placement?: "floa
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Hover opens the menu for a mouse, so a mouse click only opens it. On touch
+  // there is no hover, and a click that only opened left no way to close it
+  // with a second tap.
+  const lastPointerType = useRef("mouse");
+
+  // Anchored to the trigger's right edge, the menu ran off the left edge of the
+  // screen when the trigger wrapped to the start of a row (about 700px wide).
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!open || !menu) return;
+    menu.classList.remove("language-menu--start");
+    if (menu.getBoundingClientRect().left < 8) menu.classList.add("language-menu--start");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -134,7 +148,8 @@ export function LanguageSelector({ placement = "floating" }: { placement?: "floa
         aria-haspopup="menu"
         aria-label={t("Select language")}
         className="language-trigger"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen((current) => lastPointerType.current === "mouse" ? true : !current)}
+        onPointerDown={(event) => { lastPointerType.current = event.pointerType; }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") { event.preventDefault(); event.stopPropagation(); openFromKeyboard(0); }
           if (event.key === "ArrowUp") { event.preventDefault(); event.stopPropagation(); openFromKeyboard(locales.length - 1); }
@@ -147,7 +162,7 @@ export function LanguageSelector({ placement = "floating" }: { placement?: "floa
         <ChevronDown aria-hidden="true" className="language-chevron" />
       </button>
       {open ? (
-        <div aria-label={t("Language")} className="language-menu" role="menu">
+        <div aria-label={t("Language")} className="language-menu" ref={menuRef} role="menu">
           {locales.map((option, index) => (
             <button
               aria-checked={option === locale}

@@ -623,8 +623,12 @@
   line-height: 1.15;
 }
 
+/* One column per tile, however many tiles there are. repeat(3) left an empty
+   third column beside the advertiser's two tiles at every width. */
 .topbar .metrics {
-  grid-template-columns: repeat(3,minmax(118px,1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(118px,1fr);
   gap: 8px;
   width: min(540px,56%);
 }
@@ -812,7 +816,9 @@
 }
 
 .topbar .metrics {
-  grid-template-columns: repeat(3,minmax(0,1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0,1fr);
   width: 100%;
   overflow: visible;
 }
@@ -1488,5 +1494,42 @@
   .buying-step > a,
   .buying-step > span {
     padding: 5px;
+  }
+}
+
+/* ---- Small shell fixes (UI audit) ------------------------------------------ */
+
+/* The assistant launcher is fixed at the bottom right. Without room below the
+   last content it covered the end of every page: a form field, a button, the
+   map's zoom controls. */
+.workspace {
+  padding-bottom: 96px;
+}
+
+/* A top bar that holds only the language menu (Network control) kept the
+   tools' 680px width, so "Screen network command centre" wrapped with space
+   to spare. */
+.topbar-tools:not(:has(.metrics)) {
+  width: auto;
+}
+
+/* The sidebar's focus ring (#1f7a5a42 on #111b22) was almost invisible, and the
+   active item's box-shadow replaced it. An outline does not compete with it. */
+.sidebar a:focus-visible,
+.sidebar button:focus-visible {
+  outline: 2px solid #7fd3b1;
+  outline-offset: 2px;
+}
+
+/* In a short window the column nav scrolls with no sign that it does:
+   "Performance" and "Billing" were simply gone at 600px tall. Shadows appear at
+   an edge only while there is more to scroll past it. */
+@media (min-width: 901px) {
+  .sidebar .nav {
+    background:
+      linear-gradient(var(--workspace-nav, #111b22) 30%, #0000) center top / 100% 28px no-repeat local,
+      linear-gradient(#0000, var(--workspace-nav, #111b22) 70%) center bottom / 100% 28px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, #0000008c, #0000) center top / 100% 12px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, #0000008c, #0000) center bottom / 100% 12px no-repeat scroll;
   }
 }

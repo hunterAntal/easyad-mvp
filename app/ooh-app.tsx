@@ -41,6 +41,7 @@ export default function OohApp({
   initialInstitutionOperators = [],
   initialRole = "advertiser",
   initialView = "portal",
+  initialNavCollapsed = false,
   initialFormat,
   initialFilters,
   initialLocationId,
@@ -65,6 +66,7 @@ export default function OohApp({
   initialInstitutionOperators?: DbUser[];
   initialRole?: Role;
   initialView?: View;
+  initialNavCollapsed?: boolean;
   initialFormat?: FormatKey;
   initialFilters?: Partial<Filters>;
   initialLocationId?: string;
@@ -78,9 +80,12 @@ export default function OohApp({
   surface?: "marketplace" | "government";
 }) {
   const { t } = useI18n();
-  // Starts expanded on the server and the first client render so the markup
-  // matches, then adopts the remembered choice.
-  const [navCollapsed, setNavCollapsed] = useState(false);
+  // The server reads the remembered choice from the cookie and passes it in, so
+  // the first paint already has the right sidebar. Starting expanded and
+  // adopting the cookie after mount painted a 244px sidebar that then snapped
+  // to the 76px rail on a slow load. The effect below still reads the cookie,
+  // for a page the server rendered without it.
+  const [navCollapsed, setNavCollapsed] = useState(initialNavCollapsed);
   useEffect(() => {
     if (readBrowserPreference(SIDEBAR_COOKIE_NAME) === "1") setNavCollapsed(true);
   }, []);
@@ -587,6 +592,7 @@ export default function OohApp({
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
           <BookingView
+            advertiserNameFixed={currentUser?.role === "advertiser"}
             item={selectedInventory}
             inventory={inventory}
             draft={bookingDraft}

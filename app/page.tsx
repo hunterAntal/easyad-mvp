@@ -6,7 +6,7 @@ import type { CreativeDraft, Filters } from "./types";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import TorontoStarter from "./component/toronto-starter";
-import { INTRO_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
+import { INTRO_COOKIE_NAME, SIDEBAR_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
 import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
 import GovernmentAccessDenied from "./component/government-access-denied";
 import { getFeatureFlags } from "./lib/feature-flags";
@@ -111,6 +111,7 @@ export default async function Page({ searchParams }: PageProps) {
         initialInstitutionOperators={institutionOperators}
         initialRole={effectiveRole}
         initialView={effectiveView}
+        initialNavCollapsed={cookieStore.get(SIDEBAR_COOKIE_NAME)?.value === "1"}
         initialFormat={isFormat(format) ? format : undefined}
         initialLocationId={isLocation(locationId) ? locationId : undefined}
         initialArea={areaX !== undefined && areaY !== undefined ? { x: areaX, y: areaY } : undefined}

@@ -197,6 +197,12 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
   height: 8px;
 }
 
+/* Set by LanguageSelector when the right-anchored menu would leave the screen. */
+.language-menu.language-menu--start {
+  left: 0;
+  right: auto;
+}
+
 .language-option {
   display: flex;
   align-items: center;
