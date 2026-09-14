@@ -137,6 +137,19 @@ Use `--line-strong` for the edge of a control. Use `--line` for a decorative hai
 
 The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. [DESIGN.md](DESIGN.md) mirrors them. The measured basis, the rejected alternatives, and the AODA obligation are in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
 
+## Session Skills
+
+`.claude/skills/` holds skills that ship with this repository, so every person
+working on it gets the same routine.
+
+| Skill | Say | What it does |
+|---|---|---|
+| `lights-off` | "lights off", "wrap up", "shut down" | Verifies the work, updates `README.md` and `DESIGN.md`, commits to the feature branch, stops servers this session started, and reports what is left |
+
+`lights-off` never pushes, never opens a pull request, and never merges. Those
+reach other people, so it asks instead. It also refuses to commit when
+`npm test`, `tsc` or `npm run build` fails.
+
 ## Advertiser Vocabulary
 
 The product serves two populations with one component set. Operators, institutions, and government staff are trained, so their screens keep the precise operational terms: loop time, inventory, occupancy. An advertiser is often a small-business owner buying outdoor media for the first time, so advertiser screens name the task instead of the trade.
