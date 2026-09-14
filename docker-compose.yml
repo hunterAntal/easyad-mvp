@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ooh_app_password
       POSTGRES_DB: ooh_market
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ooh_postgres_data:/var/lib/postgresql/data
       - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
