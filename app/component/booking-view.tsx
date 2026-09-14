@@ -11,7 +11,10 @@ import { useI18n } from "../i18n/client";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 import { isInventoryAvailableForDates } from "../lib/inventory-availability";
 
-export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, canBuy }: {
+export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, canBuy, advertiserNameFixed = false }: {
+  // An advertiser's booking always carries the account name (the server sets
+  // it), so an editable "Advertiser" field did nothing for them.
+  advertiserNameFixed?: boolean;
   item: InventoryItem;
   inventory: InventoryItem[];
   draft: BookingDraft;
@@ -67,7 +70,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
       <div className="panel">
         <PanelHeading eyebrow={isStatic ? "Book this billboard" : "Book time on this screen"} title={item.name} action={<span className={`status ${blocked ? "bad" : "good"}`}>{t(isStatic ? staticAvailable ? "Available" : "Unavailable" : conflict ? "Fully booked" : "Available")}</span>} />
         <div className="form-grid">
-          {(["advertiser", "campaign", "start", "end"] as (keyof BookingDraft)[]).map((key) => (
+          {((advertiserNameFixed ? ["campaign", "start", "end"] : ["advertiser", "campaign", "start", "end"]) as (keyof BookingDraft)[]).map((key) => (
             <label key={key}>
               {t(capitalize(key === "start" ? "Start date" : key === "end" ? "End date" : key))}
               <input type={key === "start" || key === "end" ? "date" : "text"} value={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
