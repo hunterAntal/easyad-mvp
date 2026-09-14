@@ -220,6 +220,23 @@
   grid-template-columns: minmax(220px,1fr) minmax(132px,174px) auto auto auto;
 }
 
+/* Five columns need at least 758px. This rule is more specific than the
+   one-column rule at 900px, so between 601px and about 1080px the card scrolled
+   the page sideways or was clipped, with Approve and Reject cut off. Below
+   1181px the details and preview share a row and the status and actions take
+   the full width under them. The list panel is narrower than the card until
+   about 1140px with the full sidebar. */
+@media (max-width:1180px) {
+
+.approval-card.has-creative-preview {
+  grid-template-columns: minmax(0,1fr) minmax(120px,160px);
+}
+
+.approval-card.has-creative-preview > :nth-child(n+3) {
+  grid-column: 1 / -1;
+}
+}
+
 .approval-creative-preview {
   color: var(--blue);
   gap: 5px;
@@ -341,7 +358,8 @@
 
 .approval-card,
 .approval-history-row,
-.media-card {
+.media-card,
+.approval-card.has-creative-preview {
   grid-template-columns: 1fr;
 }
 
