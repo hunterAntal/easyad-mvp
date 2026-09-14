@@ -1,5 +1,6 @@
 export const frAdditional: Record<string, string> = {
   "The assistant is unavailable right now.": "L’assistant n’est pas disponible pour le moment.",
+  "Once approved campaigns start running on your screens, what they delivered appears here.": "Dès que des campagnes approuvées sont diffusées sur vos écrans, leurs résultats s’affichent ici.",
   "Comments ({count})": "Commentaires ({count})",
   "Your ad plays here": "Votre annonce s’affiche ici",
   "Size, file types and tags": "Dimensions, types de fichiers et étiquettes",

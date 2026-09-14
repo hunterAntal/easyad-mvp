@@ -57,10 +57,12 @@ export function ReportsView({
         {chartRows.length ? (
           <div className="bar-chart">{chartRows.map((row) => <div key={row.id}><span title={row.name}>{row.name}</span><i style={{ height: Math.max(12, row.impressions / Math.max(1, chartPeak) * 150) }} /><small>{formatNumber(row.impressions)}</small></div>)}</div>
         ) : (
+          // Operators and owners see this page too. The advertiser copy and its
+          // "Find screens" link sent them to a view the server bounces them from.
           <EmptyState
             title="No delivery to report yet"
-            copy="Once a screen owner approves your ad and it starts running, what it delivered appears here."
-            action={<a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a>}
+            copy={isAdvertiser ? "Once a screen owner approves your ad and it starts running, what it delivered appears here." : "Once approved campaigns start running on your screens, what they delivered appears here."}
+            action={isAdvertiser ? <a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a> : undefined}
           />
         )}
       </div>
@@ -129,8 +131,10 @@ export function BillingView({
           {isAdvertiser ? null : <Metric label="Operator payable" value={money(operator, locale)} />}
           <Metric label={isAdvertiser ? "Still to pay" : "Open invoices"} value={outstanding} />
         </div>
-        <div className="inventory-table billing-table">
-          {rows.length ? <div className="table-head"><span>{t("Reference")}</span><span>{t("Advertiser")}</span><span>{t(isAdvertiser ? "Amount" : "Gross")}</span><span>{t("Platform")}</span><span>{t("Operator")}</span><span>{t("Gateway")}</span><span>{t("Status")}</span></div> : null}
+        {/* The tiles above hide the platform share and operator payable from a
+            buyer on purpose. The table showed both anyway, per invoice. */}
+        <div className={`inventory-table billing-table${isAdvertiser ? " is-advertiser" : ""}`}>
+          {rows.length ? <div className="table-head"><span>{t("Reference")}</span><span>{t("Advertiser")}</span><span>{t(isAdvertiser ? "Amount" : "Gross")}</span>{isAdvertiser ? null : <><span>{t("Platform")}</span><span>{t("Operator")}</span></>}<span>{t("Gateway")}</span><span>{t("Status")}</span></div> : null}
           {rows.map(({ booking, amount, platformFee, operatorPayout, status, gatewayRef }) => {
             const paid = status === "paid";
             return (
@@ -138,8 +142,7 @@ export function BillingView({
                 <span><strong>INV-{booking.id.replace("BK-", "")}</strong><small>{booking.campaign}</small></span>
                 <span>{booking.advertiser}</span>
                 <span>{money(amount, locale)}</span>
-                <span>{money(platformFee, locale)}</span>
-                <span>{money(operatorPayout, locale)}</span>
+                {isAdvertiser ? null : <><span>{money(platformFee, locale)}</span><span>{money(operatorPayout, locale)}</span></>}
                 <span><small className="gateway-ref">{gatewayRef ?? "-"}</small></span>
                 <span>
                   {paymentsEnabled ? (

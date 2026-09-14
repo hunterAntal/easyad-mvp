@@ -27,6 +27,12 @@
 .billing-table .table-row {
   grid-template-columns: 1.2fr 1fr .8fr .8fr .8fr 1.1fr .8fr;
 }
+
+/* A buyer's invoices have no platform or operator columns. */
+.billing-table.is-advertiser .table-head,
+.billing-table.is-advertiser .table-row {
+  grid-template-columns: 1.2fr 1fr .8fr 1.1fr .8fr;
+}
 }
 
 .report-metrics {
