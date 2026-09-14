@@ -144,11 +144,15 @@ working on it gets the same routine.
 
 | Skill | Say | What it does |
 |---|---|---|
+| `lights-on` | "lights on", "start up", "pick up where we left off" | Fetches what teammates pushed, starts PostgreSQL and the dev server on 3001, checks the app answers, and summarizes the last session |
 | `lights-off` | "lights off", "wrap up", "shut down" | Verifies the work, updates `README.md` and `DESIGN.md`, commits to the feature branch, stops servers this session started, and reports what is left |
 
-`lights-off` never pushes, never opens a pull request, and never merges. Those
-reach other people, so it asks instead. It also refuses to commit when
-`npm test`, `tsc` or `npm run build` fails.
+The pair is deliberate. `lights-on` opens the day and `lights-off` closes it.
+
+Neither one pushes, opens a pull request, or merges. Those reach other people,
+so they ask instead. `lights-off` also refuses to commit when `npm test`, `tsc`
+or `npm run build` fails, and `lights-on` never discards local work to make a
+pull succeed.
 
 ## Advertiser Vocabulary
 
