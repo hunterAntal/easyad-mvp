@@ -291,11 +291,24 @@
 /* The map legend would sit under the floating card, so it moves aside. */
 .discover-grid .map-stage .map-legend {
   left: 380px;
+  /* Only the space beside the card. At 1121-1380px with the full sidebar the
+     map is about 517px wide and the one-line legend ran past its edge. */
+  max-width: calc(100% - 394px);
 }
 
+.discover-grid .map-stage .map-legend span {
+  white-space: normal;
+}
+
+/* The list fills what the panel heading leaves. A fixed max-height (582px, or
+   362px at 1120px) plus the 65px heading was taller than the panel's own
+   max-height, which clips, so the last card and the end of the scrollbar could
+   not be reached. */
 .inventory-list {
   gap: 0;
-  max-height: 582px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   padding: 6px;
   overflow-y: auto;
 }
@@ -401,6 +414,7 @@
 
 .discover-grid .map-stage .map-legend {
   left: 14px;
+  max-width: calc(100% - 28px);
 }
 
 .filters-panel {
@@ -408,7 +422,7 @@
 }
 
 .inventory-list {
-  max-height: 362px;
+  max-height: none;
 }
 }
 
