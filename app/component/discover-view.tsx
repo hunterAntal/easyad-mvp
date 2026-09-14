@@ -1,14 +1,14 @@
 "use client";
 
 import "./discover-view.css";
-import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, InventoryItem, businesses, formats } from "../data";
 import type { Filters, MapPoint } from "../types";
 import { defaultFilters, formatRatio, mapDistanceKm, money, number } from "../utils";
 import FiltersPanel from "./filters-panel";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import { PlaceComments } from "./place-panel";
-import DeviceScreen from "./device-screen";
+import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
 import { deriveScreenCity, resolveDeviceTemplate } from "./device-templates";
 import { Meter, Metric, PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
@@ -118,7 +118,7 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
           buyer's ad would play, instead of the operator-facing "No images or
           videos have been uploaded", which stays on the real public screen. */}
       {isDigitalInventory(item) ? (
-        <ScaledScreenPreview>
+        <ScaledDevicePreview className="detail-preview">
           <DeviceScreen
             inventoryName={item.name}
             city={deriveScreenCity(item.address)}
@@ -129,7 +129,7 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
             mediaContent={<div className="detail-preview-empty">{t("Your ad plays here")}</div>}
             preview
           />
-        </ScaledScreenPreview>
+        </ScaledDevicePreview>
       ) : null}
       <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Book")}</button>} />
       <div className="detail-grid stat-tiles">
@@ -176,34 +176,3 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
   );
 }
 
-// DeviceScreen sizes its text in vw and fills its container, because it was
-// built for a full-width player. At card width that overflows. The stage
-// renders it at the size the profile page shows it, then scales the whole frame
-// down, so the card holds a faithful thumbnail rather than a squashed layout.
-// The initial scale is a constant so server and client markup match; the real
-// width is measured after mount.
-const PREVIEW_STAGE_WIDTH = 1280;
-
-function ScaledScreenPreview({ children }: { children: ReactNode }) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.25);
-
-  useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame) return;
-    const update = () => {
-      if (frame.clientWidth) setScale(frame.clientWidth / PREVIEW_STAGE_WIDTH);
-    };
-    update();
-    if (!("ResizeObserver" in window)) return;
-    const observer = new ResizeObserver(update);
-    observer.observe(frame);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div className="detail-preview" ref={frameRef}>
-      <div className="detail-preview-stage" style={{ transform: `scale(${scale})` }}>{children}</div>
-    </div>
-  );
-}

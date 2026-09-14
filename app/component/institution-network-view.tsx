@@ -6,7 +6,7 @@ import { AlertTriangle, ExternalLink, Images, MapPinned, MonitorUp, Radio, Shiel
 import type { Booking, Creative, DeviceAlert, DeviceAlertType, InventoryItem, MediaResource } from "../data";
 import { deviceTemplates, resolveDeviceTemplate } from "./device-templates";
 import type { DeviceMediaSlide } from "./device-media-carousel";
-import DeviceScreen from "./device-screen";
+import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import { PanelHeading } from "./shared-ui";
 import AppDialog from "./app-dialog";
@@ -170,9 +170,9 @@ export default function InstitutionNetworkView({
             action={<span className={`status ${selectedAlert ? "bad" : isPublished ? "good" : ""}`}>{t(selectedAlert ? "Override active" : isPublished ? "Published" : "Unpublished")}</span>}
           />
           <div className="network-preview-note"><Radio aria-hidden="true" /><span>{t("Content preview, not a live camera feed")}</span></div>
-          <div className="network-screen-frame">
+          <ScaledDevicePreview className="network-screen-frame">
             <DeviceScreen inventoryName={selected.name} city={deriveCity(selected.address)} imageInterval={selected.imageInterval} slides={slides} template={template} displayLanguage={selected.displayLanguage ?? "en"} activeAlert={selectedAlert} preview />
-          </div>
+          </ScaledDevicePreview>
           <div className="network-device-meta">
             <div><span>{t("Template")}</span><strong>{t(templateLabel)}</strong></div>
             <div><span>{t("Approved content")}</span><strong>{t(selectedApprovedResources.length === 1 ? "{count} item" : "{count} items", { count: selectedApprovedResources.length })}</strong></div>

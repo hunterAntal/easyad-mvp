@@ -541,31 +541,18 @@
    The stage is the size the profile page renders the player at; the frame
    scales it down to the card's width and clips it to 16:9. */
 .detail-preview {
-  aspect-ratio: 16/9;
   border: 1px solid #1c2c35;
   border-radius: var(--radius-sm);
   background: #050708;
   width: 100%;
   max-width: 100%;
   margin-bottom: 12px;
-  position: relative;
   overflow: hidden;
 }
 
-.detail-preview-stage {
+/* The card preview is a thumbnail, not a control. */
+.detail-preview .device-preview-stage {
   pointer-events: none;
-  transform-origin: 0 0;
-  width: 1280px;
-  height: 720px;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.detail-preview-stage .device-player-preview {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
 }
 
 /* Sized for the 1280px stage: at card width this lands near 16px. */

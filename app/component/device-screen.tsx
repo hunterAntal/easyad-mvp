@@ -1,6 +1,7 @@
 "use client";
 
 import "./device-screen.css";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DeviceAlert } from "../data";
 import DeviceMediaCarousel, { DeviceMediaSlide } from "./device-media-carousel";
 import { DeviceTemplate } from "./device-templates";
@@ -20,6 +21,42 @@ type DeviceScreenProps = {
   displayLanguage?: Locale;
   activeAlert?: DeviceAlert | null;
 };
+
+// Every preview of the player goes through this frame: Discover's detail card,
+// the Command centre and the public inventory page. The player is built for a
+// full screen, so it is drawn on a 1280x720 stage and the stage is scaled to the
+// frame. The stage is a size container, so the player's cq units follow it.
+// The frame element carries the page's own border and radius; the inner
+// viewport holds the 16:9 shape, so a bordered frame still scales correctly.
+// The initial scale is a constant so server and client markup match; the real
+// width is measured after mount.
+const PREVIEW_STAGE_WIDTH = 1280;
+
+export function ScaledDevicePreview({ children, className }: { children: ReactNode; className?: string }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.25);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const update = () => {
+      if (viewport.clientWidth) setScale(viewport.clientWidth / PREVIEW_STAGE_WIDTH);
+    };
+    update();
+    if (!("ResizeObserver" in window)) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className={className}>
+      <div className="device-preview-viewport" ref={viewportRef}>
+        <div className="device-preview-stage" style={{ transform: `scale(${scale})` }}>{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function DeviceScreen(props: DeviceScreenProps) {
   const content = <DeviceScreenContent {...props} />;
