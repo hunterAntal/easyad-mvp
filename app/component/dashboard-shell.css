@@ -691,8 +691,15 @@
 
 @media (max-width:900px) {
 
+/* The shell is min-height:100vh. As one column it has two auto rows, the top
+   bar and the workspace, and a short page shared the spare height between
+   them. At 615px wide on Find screens with no screens listed, the top bar grew
+   from about 100px to 337px and every nav item stretched to 143px, so the
+   selected item became a tall green block. The workspace takes the spare
+   height; the top bar keeps its own. */
 .shell {
   grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
   width: 100%;
   overflow-x: clip;
 }
