@@ -227,7 +227,14 @@ export default function OohApp({
         .sort((a, b) => a.distance - b.distance),
     [filters, inventory, selectedLocation],
   );
-  const selectedInventory = visibleInventory.find((item) => item.id === selectedInventoryId) ?? visibleInventory[0] ?? inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0];
+  // Only Find screens and Book dates choose from the filtered list. Inventory
+  // and the other management views list every device, and used to search the
+  // radius-filtered list first: clicking a device outside the radius
+  // highlighted its row while the form showed another device, and Save failed.
+  const selectsFromFilteredList = view === "discover" || view === "booking";
+  const selectedInventory = selectsFromFilteredList
+    ? visibleInventory.find((item) => item.id === selectedInventoryId) ?? visibleInventory[0] ?? inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0]
+    : inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0];
   const canManageInventory = currentUser?.role === "operator" || currentUser?.role === "institutional" || currentUser?.role === "admin";
   const canDeleteInventory = currentUser?.role === "admin";
   const canBuyAds = currentUser?.role === "advertiser" || currentUser?.role === "admin";
