@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { ArrowUpRight } from "lucide-react";
 import { INTRO_COOKIE_MAX_AGE, INTRO_COOKIE_NAME } from "../lib/preferences";
-import { useI18n } from "../i18n/client";
+import { LanguageSelector, useI18n } from "../i18n/client";
 import { mapLibreLocale } from "../i18n/maplibre";
 
 const overviewCenter: [number, number] = [-96, 56];
@@ -61,6 +61,10 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
       <strong>{t("EasyAD Platform")}</strong>
       <span>{t("Interactive campaign canvas")}</span>
     </header>
+    {/* The page's floating language control sits under this full-screen
+        starter, so a French speaker could not switch language on the first
+        screen. The starter carries its own. */}
+    <div className="toronto-starter-language"><LanguageSelector placement="embedded" /></div>
     <section className="toronto-starter-action" aria-label={t("Enter campaign portal")}>
       <p className="starter-eyebrow"><i aria-hidden="true" />{t("Next-gen OOH marketing platform")}</p>
       <h1>{t("The city is your")} <em>{t("canvas.")}</em></h1>
