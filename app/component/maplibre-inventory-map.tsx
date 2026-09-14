@@ -74,6 +74,7 @@ export default function MapLibreInventoryMap({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRefs = useRef<Marker[]>([]);
+  const centerMarkerRef = useRef<Marker | null>(null);
   const onAreaChangeRef = useRef(onAreaChange);
   const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "fallback">("loading");
   const [deviceMarkersVisible, setDeviceMarkersVisible] = useState(() => shouldShowDeviceMarkers(initialZoom ?? DEFAULT_MAP_ZOOM));
@@ -180,12 +181,23 @@ export default function MapLibreInventoryMap({
     return () => {
       markerRefs.current.forEach((marker) => marker.remove());
       markerRefs.current = [];
+      centerMarkerRef.current?.remove();
+      centerMarkerRef.current = null;
       map.off("zoom", handleZoom);
       map.remove();
       mapRef.current = null;
     };
   }, [locale]);
 
+  // Read by the marker effect without making the selection one of its
+  // dependencies; the selection effect below keeps existing pins in step.
+  const selectedInventoryIdRef = useRef(selectedInventoryId);
+  selectedInventoryIdRef.current = selectedInventoryId;
+
+  // The search area and its centre marker follow the selected location. They
+  // are kept apart from the pins: in Network control the centre is the
+  // selected device, so while they shared one effect every selection removed
+  // and rebuilt every pin, closing the pin's popup and dropping keyboard focus.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -196,18 +208,40 @@ export default function MapLibreInventoryMap({
       map.once("load", () => syncMapData(map, selectedLocation, radius));
     }
 
+    centerMarkerRef.current?.remove();
+    centerMarkerRef.current = isPortal ? null : createCenterMarker(map, selectedLocation, locale);
+  }, [isPortal, locale, radius, selectedLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
     markerRefs.current.forEach((marker) => marker.remove());
     markerRefs.current = [
-      ...(!isPortal ? [createCenterMarker(map, selectedLocation, locale)] : []),
       ...createBusinessMarkers(map, competitorsVisible, locale),
       ...createAvailableCityMarkers(map, availableCities, (city) => {
         onAreaChangeRef.current?.(city);
         map.easeTo({ center: percentToLngLat(city), zoom: DEFAULT_MAP_ZOOM, duration: 500 });
       }, locale),
-      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryId, selectionEnabled, locale, onSelect, onMarkerOpen),
+      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryIdRef.current, selectionEnabled, locale, onSelect, onMarkerOpen),
     ];
     syncMapMarkerVisibility(map, setDeviceMarkersVisible);
-  }, [availableCities, competitorsVisible, inventory, isPortal, locale, onMarkerOpen, onSelect, radius, selectedInventoryId, selectedLocation, selectionEnabled, visibleInventory]);
+  }, [availableCities, competitorsVisible, inventory, locale, onMarkerOpen, onSelect, selectionEnabled, visibleInventory]);
+
+  // A new selection updates the existing pins in place. The marker effect used
+  // to depend on it and removed and rebuilt every marker, so a pin's popup
+  // closed as it opened and keyboard focus fell off the pin just pressed.
+  useEffect(() => {
+    markerRefs.current.forEach((marker) => {
+      const element = marker.getElement();
+      const id = element.dataset.inventoryId;
+      if (!id) return;
+      const selected = selectionEnabled && id === selectedInventoryId;
+      element.classList.toggle("selected", selected);
+      element.style.color = selected ? "var(--workspace-green)" : "var(--workspace-muted)";
+      if (selectionEnabled) element.setAttribute("aria-pressed", String(selected));
+    });
+  }, [selectedInventoryId, selectionEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -768,6 +802,7 @@ function createInventoryMarkers(
     const selected = selectionEnabled && item.id === selectedInventoryId;
     const element = document.createElement("button");
     element.type = "button";
+    element.dataset.inventoryId = item.id;
     element.className = ["device-marker", "maplibre-device-marker", visible ? "visible" : "muted", selected ? "selected" : null].filter(Boolean).join(" ");
     element.style.color = selected ? "var(--workspace-green)" : "var(--workspace-muted)";
     element.setAttribute("aria-label", `${item.name}, ${translate(locale, formats[item.format].label)}`);
