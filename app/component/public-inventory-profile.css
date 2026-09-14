@@ -1,11 +1,15 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
+/* The floating language selector is fixed at the top right (38px tall at 14px,
+   or 9px below 720px) and this page reserved no room for it. At 701-1200px it
+   covered the "Device URL" action. The top padding keeps the hero below it. */
 .public-device-page {
   background: #f5f7f6;
   align-content: start;
   gap: 22px;
   min-height: 100vh;
   padding: clamp(18px,4vw,56px);
+  padding-top: max(clamp(18px,4vw,56px), 64px);
   display: grid;
 }
 
@@ -188,6 +192,9 @@
 .public-device-page {
   gap: 16px;
   padding: 18px 14px 28px;
+  /* After the shorthand: room for the floating language selector (top 9px,
+     38px tall below 720px), which otherwise covered the page title. */
+  padding-top: 64px;
   overflow-x: clip;
 }
 
