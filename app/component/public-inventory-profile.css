@@ -1,24 +1,5 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
-.public-url-box {
-  background: var(--soft-blue);
-  border: 1px solid #cbd8e8;
-  border-radius: 8px;
-  gap: 6px;
-  margin-bottom: 14px;
-  padding: 12px;
-  display: grid;
-}
-
-.public-url-box a {
-  color: var(--blue);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: .85rem;
-  font-weight: 850;
-  overflow: hidden;
-}
-
 .public-device-page {
   background: #f5f7f6;
   align-content: start;

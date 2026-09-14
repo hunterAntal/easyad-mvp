@@ -400,3 +400,28 @@ small,
 strong {
   letter-spacing: 0;
 }
+
+/* Public device URL box. Used by the public inventory page and by the Inventory
+   editor in the workspace. It lived in public-inventory-profile.css, which the
+   workspace never loads, so there the label and both links ran together and
+   read as one URL, and the links overlapped when they wrapped. */
+.public-url-box {
+  background: var(--soft-blue);
+  border: 1px solid #cbd8e8;
+  border-radius: 8px;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 14px;
+  padding: 12px;
+  display: grid;
+}
+
+.public-url-box a {
+  color: var(--blue);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: .85rem;
+  font-weight: 850;
+  overflow: hidden;
+}
