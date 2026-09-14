@@ -133,7 +133,7 @@ The authenticated shell uses a 244px desktop sidebar and a natural-height docume
 
 A section heading stacks its eyebrow above its title on one left edge, so every heading on a page starts at the same x. An eyebrow and a title must never be split to opposite ends of a band; titles differ in width, so the result reads as inconsistent alignment.
 
-Hierarchy comes from tonal layers, borders, and restrained shadows. Workspace panels use the existing small shadow; overlays use the large shared shadow. Maps and screen previews may sit one elevation above supporting controls. Static status blocks do not receive decorative floating shadows.
+Hierarchy comes from tonal layers, borders, and restrained shadows. Workspace panels use the existing small shadow; overlays use the large shared shadow. Maps and screen previews may sit one elevation above supporting controls. Static status blocks do not receive decorative floating shadows. Layers follow the shared z-index tokens in `globals.css`. The site assistant sits above page chrome and below every dialog backdrop and toast, so it never covers a decision or an acknowledgement. The assistant reports its own failures inside its panel.
 
 ## Shapes
 

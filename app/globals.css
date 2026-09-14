@@ -46,6 +46,9 @@
   --z-dropdown: 200;
   --z-popover: 300;
   --z-header: 400;
+  /* The assistant sits above page chrome but below every dialog backdrop and
+     every toast. At 9998 it covered dialogs and hid its own error toasts. */
+  --z-assistant: 450;
   --z-backdrop: 500;
   --z-dialog: 600;
   --z-sheet: 700;
