@@ -43,6 +43,12 @@
   font-size: .78rem;
 }
 
+/* #bcc8c4 is the dark sidebar's label colour. On the white workspace panels it
+   gave about 1.7:1, so "Device location" and "Device tags" were nearly invisible. */
+.workspace .field-label {
+  color: var(--muted);
+}
+
 .select {
   border: 1px solid var(--line);
   width: 100%;

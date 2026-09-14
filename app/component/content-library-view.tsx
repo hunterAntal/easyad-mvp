@@ -52,6 +52,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const items = useMemo(() => buildLibraryItems(inventory, bookings, creatives, mediaResources), [inventory, bookings, creatives, mediaResources]);
+  // The empty state said "No matching resources, adjust the search or filters"
+  // even when nothing was searched or filtered, to an account with no content.
+  const filtering = query.trim() !== "" || typeFilter !== "all" || statusFilter !== "all";
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return items.filter((item) => typeFilter === "all" || item.mediaType === typeFilter)
@@ -80,7 +83,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
           {filtered.length ? filtered.map((item) => <button className={`cms-resource-card${selected?.id === item.id ? " selected" : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button">
             <ResourcePreview item={item} />
             <span className="cms-resource-copy"><strong>{item.title}</strong><small>{item.inventoryName}</small><span className={`status cms-status ${item.status}`}>{t(item.statusLabel)}</span></span>
-          </button>) : <div className="empty-state cms-empty"><strong>{t(isAdvertiser ? "Nothing here yet" : "No matching resources")}</strong><span>{t(isAdvertiser ? "Pictures you send with a booking appear here. Change the search or the filters to see more." : "Adjust the search or filters to see more of your content.")}</span></div>}
+          </button>) : <div className="empty-state cms-empty"><strong>{t(isAdvertiser ? "Nothing here yet" : filtering ? "No matching resources" : "No resources yet")}</strong><span>{t(isAdvertiser
+            ? filtering ? "Pictures you send with a booking appear here. Change the search or the filters to see more." : "Pictures you send with a booking appear here."
+            : filtering ? "Adjust the search or filters to see more of your content." : "Upload device media or submit campaign creative to begin building this library.")}</span></div>}
         </div>
         <aside className="cms-detail" aria-label={t("Selected resource details")}>
           {selected ? <>
