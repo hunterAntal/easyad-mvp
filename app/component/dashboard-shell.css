@@ -579,7 +579,13 @@
   padding: 0 24px 28px;
 }
 
+/* backdrop-filter makes the top bar a stacking context. Without its own
+   z-index, the language menu's z-index counted only inside the bar, and any
+   positioned element later on the page painted over the open menu. 30 is below
+   the phone top bar (40) and the assistant (450). */
 .topbar {
+  z-index: 30;
+  position: relative;
   border-bottom: 1px solid var(--workspace-line);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -943,7 +949,9 @@
 @media (max-width:600px) {
   .government-brand { grid-template-columns: 34px minmax(0,1fr); gap: 8px; }
   .government-brand-mark { width: 34px; height: 34px; }
-  .government-brand span,
+  /* As specific as the rule that shows the subtitle, so this one wins. A bare
+     ".government-brand span" lost, and the sticky phone bar grew to 163px. */
+  .government-brand > div > span,
   .government-scope-card small { display: none; }
   .government-brand strong { font-size: .72rem; }
   .government-scope-card { grid-template-columns: 28px minmax(0,1fr); min-height: 44px; padding: 6px; }
@@ -1076,7 +1084,11 @@
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
+/* Above the top bar (30). The rail's workspace menu opens beside the rail, over
+   the workspace; inside a z-index 20 sidebar the taller stacked top bar at
+   1121px and below painted over the menu's options. */
 .sidebar.is-rail {
+  z-index: 35;
   align-items: center;
   padding: 60px 10px 14px;
 }
@@ -1099,6 +1111,9 @@
 /* .brand-mark is itself a div inside .brand, so a bare ".brand div" clipped the
    "EA" badge to 1x1 and left a hole at the top of the rail. */
 .sidebar.is-rail .brand > div:not(.brand-mark),
+/* The government brand is not a .brand, so its "EasyAD Platform / Civic Screen
+   Operations" text showed through the rail and ran into the page title. */
+.sidebar.is-rail .government-brand > div:not(.government-brand-mark),
 .sidebar.is-rail .tenant-identity,
 .sidebar.is-rail .workspace-switcher-copy,
 .sidebar.is-rail .workspace-switcher-chevron,
@@ -1194,6 +1209,16 @@
   border: 0;
   width: 44px;
   padding: 0;
+}
+
+/* The menu spans its switcher (left/right -1px). In the rail that made it 46px
+   wide, and the "Advertiser ✓" option stuck out over the page edge. It opens
+   beside the rail instead. */
+.sidebar.is-rail .workspace-menu {
+  top: 0;
+  left: calc(100% + 8px);
+  right: auto;
+  min-width: 180px;
 }
 
 .sidebar.is-rail .brand-mark {
