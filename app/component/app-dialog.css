@@ -18,7 +18,13 @@
   backdrop-filter: blur(3px);
 }
 
+/* A column: the header keeps its height and the body scrolls in what is left.
+   The dialog capped at 100dvh - 32px with overflow hidden while the body capped
+   at 100dvh - 150px on its own, so a tall header (long title, French) pushed
+   the bottom of the body, and its actions, out of reach in a short window. */
 .app-dialog {
+  flex-direction: column;
+  display: flex;
   position: relative;
   z-index: var(--z-dialog);
   width: min(640px,100%);
@@ -74,7 +80,8 @@
 }
 
 .app-dialog-body {
-  max-height: calc(100dvh - 150px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
 }
