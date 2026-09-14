@@ -8,6 +8,7 @@ import { capitalize, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick
 import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
+import LocalDateTime from "./local-date-time";
 
 export default function CreativeView({
   draft,
@@ -151,7 +152,7 @@ export default function CreativeView({
           {submittedCreative ? (
             <div className="decision-banner good">
               <strong>{t("Creative on file - {status}", { status: t(submittedCreative.status) })}</strong>
-              <span>{t("{summary}, submitted {date}.", { summary: creativeSummary(submittedCreative), date: formatDate(submittedCreative.createdAt, { dateStyle: "medium", timeStyle: "short" }) })}</span>
+              <span><LocalDateTime value={submittedCreative.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} template="{summary}, submitted {date}." variables={{ summary: creativeSummary(submittedCreative) }} /></span>
               {submittedCreative.publicUrl ? <a href={submittedCreative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a> : null}
             </div>
           ) : null}

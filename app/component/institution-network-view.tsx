@@ -13,6 +13,7 @@ import AppDialog from "./app-dialog";
 import { toast } from "./toast";
 import { useExpiringClock } from "./use-expiring-clock";
 import { useI18n } from "../i18n/client";
+import { toDate } from "../utils";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import PlayerControl from "./player-control";
 
@@ -370,7 +371,7 @@ function emptyAlertDraft(selectedDeviceId: string, published: InventoryItem[]): 
 
 function deviceSlides(selected: InventoryItem, mediaResources: MediaResource[], bookings: Booking[], creatives: Creative[]): DeviceMediaSlide[] {
   const mediaSlides = mediaResources.filter((resource) => resource.inventoryId === selected.id && resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video")).map((resource) => ({ id: resource.id, title: resource.title, subtitle: resource.originalName, mediaType: resource.mediaType as "image" | "video", publicUrl: resource.publicUrl, createdAt: resource.createdAt }));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDate(new Date()); // local date, not the UTC date
   const bookingMap = new Map(bookings.filter((booking) => booking.inventoryId === selected.id && booking.start <= today && booking.end >= today && ["approved", "scheduled", "live"].includes(booking.status)).map((booking) => [booking.id, booking]));
   const creativeSlides = creatives.filter((creative) => creative.status === "approved" && Boolean(creative.publicUrl) && bookingMap.has(creative.bookingId)).map((creative) => { const booking = bookingMap.get(creative.bookingId)!; return { id: creative.id, title: booking.campaign, subtitle: booking.advertiser, mediaType: creative.mimeType?.startsWith("video/") ? "video" as const : "image" as const, publicUrl: creative.publicUrl!, createdAt: creative.createdAt }; });
   return [...mediaSlides, ...creativeSlides].sort((left, right) => right.createdAt.localeCompare(left.createdAt));

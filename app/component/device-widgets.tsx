@@ -25,7 +25,7 @@ function mulberry32(seed: number) {
   };
 }
 
-function useMounted() {
+export function useMounted() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted;
@@ -93,16 +93,17 @@ export function DeviceClock({ city }: { city: string }) {
 
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function buildForecast(seed: string) {
+// todayIndex is null until mount. Read during render, the weekday came from the
+// server's clock (UTC), so the day labels could differ from the browser's.
+function buildForecast(seed: string, todayIndex: number | null) {
   const rand = mulberry32(hashSeed(`${seed}-weather`));
   const baseTemp = Math.round(6 + rand() * 16);
   const current = conditions[Math.floor(rand() * conditions.length)];
-  const todayIndex = new Date().getDay();
   const days = Array.from({ length: 4 }, (_, offset) => {
     const condition = conditions[Math.floor(rand() * conditions.length)];
     const hi = baseTemp + Math.round(rand() * 5) - offset;
     const lo = hi - Math.round(4 + rand() * 5);
-    return { label: offset === 0 ? "Today" : dayNames[(todayIndex + offset) % 7], condition: condition.key, hi, lo };
+    return { label: offset === 0 ? "Today" : todayIndex === null ? "" : dayNames[(todayIndex + offset) % 7], condition: condition.key, hi, lo };
   });
   return {
     current: current.key,
@@ -117,7 +118,8 @@ function buildForecast(seed: string) {
 
 export function WeatherPanel({ city, seed, compact = false }: { city: string; seed: string; compact?: boolean }) {
   const { t } = useI18n();
-  const forecast = buildForecast(seed);
+  const mounted = useMounted();
+  const forecast = buildForecast(seed, mounted ? new Date().getDay() : null);
   if (compact) {
     return (
       <div className="weather-compact">

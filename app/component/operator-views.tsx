@@ -9,6 +9,7 @@ import { EditorInput, Meter, PanelHeading } from "./shared-ui";
 import PreciseLocationPicker from "./precise-location-picker";
 import { deviceTemplates } from "./device-templates";
 import AsyncButton from "./async-button";
+import LocalDateTime from "./local-date-time";
 import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
 import { localeNames, locales } from "../i18n/config";
@@ -459,7 +460,7 @@ export function ApprovalsView({
               <span className={`status ${event.action === "approved" ? "good" : "bad"}`}>{t(event.action)}</span>
               <span><strong>{event.campaign}</strong><small>{event.bookingId} - {event.inventoryId}</small></span>
               <span>{t(event.previousStatus)}<small>{t("to")} {t(event.nextStatus)}</small></span>
-              <span>{event.actorName}<small>{formatDate(event.createdAt, { dateStyle: "medium", timeStyle: "short" })}</small></span>
+              <span>{event.actorName}<small><LocalDateTime value={event.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} /></small></span>
             </div>
           )) : (
             <div className="empty-state"><strong>{t("No approval history yet")}</strong><span>{t("Approved and rejected campaigns will appear here for tracking.")}</span></div>
@@ -476,5 +477,17 @@ function CalendarCell({ item, weekStart, bookings }: { item: InventoryItem; week
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const booking = bookings.find((entry) => entry.inventoryId === item.id && overlaps(toDate(weekStart), toDate(weekEnd), entry.start, entry.end));
-  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? booking.status.split(" ")[0] : "Available")}</span>;
+  // A short label per status. It printed the first word of the status, so a
+  // cell read "pending" or "creative", untranslated even in French.
+  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? calendarStatusLabels[booking.status] ?? capitalize(booking.status) : "Available")}</span>;
 }
+
+const calendarStatusLabels: Record<string, string> = {
+  "pending approval": "Pending",
+  "creative review": "In review",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  live: "Live",
+  completed: "Completed",
+  rejected: "Rejected",
+};

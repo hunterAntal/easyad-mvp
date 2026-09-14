@@ -6,6 +6,7 @@ import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdve
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import { money } from "../utils";
 import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
+import LocalDateTime from "./local-date-time";
 import DeviceApiGuide from "./device-api-guide";
 import type { DeviceMediaSlide } from "./device-media-carousel";
 import { deriveScreenCity, deviceTemplates, resolveDeviceTemplate } from "./device-templates";
@@ -123,7 +124,7 @@ function DeviceResourceCard({ resource, locale, formatDate }: { resource: MediaR
         <span className="eyebrow">{t("Device resource")}</span>
         <h3>{resource.title}</h3>
         <p>{resource.originalName}</p>
-        <small>{t(resource.mediaType)} - {t("uploaded {date}", { date: formatDate(resource.createdAt, { dateStyle: "medium", timeStyle: "short" }) })}</small>
+        <small>{t(resource.mediaType)} - <LocalDateTime value={resource.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} template="uploaded {date}" /></small>
         <a href={resource.publicUrl} target="_blank" rel="noreferrer">{t("Open media file")}</a>
       </div>
     </article>

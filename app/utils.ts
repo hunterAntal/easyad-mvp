@@ -230,8 +230,13 @@ export function templateTitle(template: CreativeDraft["template"]) {
   return { retail: "Save 30% In Store", finance: "Better Banking Nearby", event: "City Nights Festival" }[template];
 }
 
+// The local calendar date as YYYY-MM-DD. It used toISOString, which is the UTC
+// date: after 8 pm in Toronto "today" was already tomorrow, so a booking that
+// ends today read as over and tomorrow's booking played early.
 export function toDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function pointToLngLat(point: { x: number; y: number }): [number, number] {

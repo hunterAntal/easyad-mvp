@@ -5,7 +5,8 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, FileImage, Film, Image as ImageIcon, Layers3, Search, Trash2, X } from "lucide-react";
 import type { Booking, Creative, InventoryItem, MediaResource } from "../data";
 import type { DbUser } from "../lib/db";
-import { capitalize } from "../utils";
+import { capitalize, toDate } from "../utils";
+import { useMounted } from "./device-widgets";
 import AsyncButton from "./async-button";
 import { PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
@@ -41,6 +42,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   onOpenInventory: (inventoryId: string) => void;
 }) {
   const { formatDate, formatNumber, t } = useI18n();
+  // "Added" is a timestamp. Formatted during the server render it used the
+  // server's zone and differed from the browser's text.
+  const mounted = useMounted();
   const isAdvertiser = currentUser?.role === "advertiser";
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -82,7 +86,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
           {selected ? <>
             <ResourcePreview item={selected} large />
             <div className="cms-detail-heading"><span className={`status cms-status ${selected.status}`}>{t(selected.statusLabel)}</span><h3>{selected.title}</h3><p>{selected.subtitle}</p></div>
-            <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={formatDate(selected.createdAt)} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
+            <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={mounted ? formatDate(selected.createdAt) : ""} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
             <div className="cms-detail-actions">
               {selected.publicUrl ? <a className="secondary-button" href={selected.publicUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open")}</a> : null}
               {selected.booking && (currentUser?.role === "advertiser" || currentUser?.role === "admin") ? <button className="secondary-button" onClick={() => onOpenCreative(selected.booking!)} type="button">{t("Edit creative")}</button> : null}
@@ -138,7 +142,7 @@ export function buildLibraryItems(inventory: InventoryItem[], bookings: Booking[
 }
 
 function creativeStatus(booking: Booking, creative: Creative): { key: ResourceStatus; label: string } {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDate(new Date()); // local date, not the UTC date
   if (booking.status === "rejected" || booking.status === "completed" || booking.end < today || creative.status === "needs changes") return { key: "inactive", label: creative.status === "needs changes" ? "Needs changes" : capitalize(booking.status) };
   if (creative.status === "pending review" || booking.status === "pending approval" || booking.status === "creative review") return { key: "review", label: creative.status === "pending review" ? "In review" : capitalize(booking.status) };
   if (booking.start > today || booking.status === "scheduled") return { key: "scheduled", label: "Scheduled" };

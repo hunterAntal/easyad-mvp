@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DeviceAlert } from "../data";
 import DeviceMediaCarousel, { DeviceMediaSlide } from "./device-media-carousel";
 import { DeviceTemplate } from "./device-templates";
-import { DeviceClock, PublicInfoPanel, TransitPanel, WeatherPanel } from "./device-widgets";
+import { DeviceClock, PublicInfoPanel, TransitPanel, WeatherPanel, useMounted } from "./device-widgets";
 import { useExpiringClock } from "./use-expiring-clock";
 import { FixedLocaleProvider, useI18n } from "../i18n/client";
 import type { Locale } from "../i18n/config";
@@ -142,7 +142,10 @@ function DeviceScreenContent({
 function EmergencyAlertScreen({ alert }: { alert: DeviceAlert }) {
   const { formatDate, t } = useI18n();
   const typeLabel = alert.alertType === "amber" ? "AMBER Alert" : alert.alertType === "evacuation" ? "Evacuation notice" : "Public safety alert";
-  const expires = formatDate(alert.expiresAt, { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  // After mount: during the server render the expiry time came out in the
+  // server's zone, so the kiosk flashed a different time and a hydration error.
+  const mounted = useMounted();
+  const expires = mounted ? formatDate(alert.expiresAt, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : "";
   return (
     <section className={`emergency-screen emergency-${alert.alertType}`} role="alert" aria-label={`${typeLabel}: ${alert.title}`}>
       <header><span className="emergency-beacon" aria-hidden="true" /><strong>{t(typeLabel)}</strong><span>{t("Screen emergency override")}</span></header>
