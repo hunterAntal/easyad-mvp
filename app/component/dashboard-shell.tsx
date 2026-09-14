@@ -183,6 +183,14 @@ const governmentNav: NavItem[] = [
 type AppSurface = "marketplace" | "government";
 
 export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void }) {
+  // At 900px and below the nav is a strip that scrolls sideways and loaded at
+  // its start, so "Results" or "Invoices" could be the current page with no
+  // visible "you are here". Bring the current item into view. "nearest" does
+  // nothing when it is already visible, so the page itself does not jump.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current?.querySelector<HTMLElement>("a.active")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [view]);
   const { t } = useI18n();
   const roleOptions = currentUser?.role === "admin" ? [...roleValues] : currentUser ? [currentUser.role] : [...roleValues];
   const displayRole = roleLabel(role);
@@ -211,7 +219,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           <div><small>{t("Secure workspace")}</small><strong>{t(role === "admin" ? "Cross-institution oversight" : "Institution network")}</strong></div>
         </div>
       ) : <WorkspaceSwitcher role={role} options={roleOptions} onSelect={(next) => { setRole(next); setView(roleWorkspaceView[next]); }} />}
-      <nav className="nav" aria-label={isGovernment ? t("Civic Screen Operations navigation") : t("{role} navigation", { role: t(displayRole) })}>
+      <nav className="nav" ref={navRef} aria-label={isGovernment ? t("Civic Screen Operations navigation") : t("{role} navigation", { role: t(displayRole) })}>
         {groups.map((group) => {
           const items = navigation.filter((item) => item.group === group);
           if (!items.length) return null;
