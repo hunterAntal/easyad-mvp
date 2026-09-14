@@ -412,47 +412,15 @@
 }
 }
 
-@media (max-width:600px) {
-
-.detail-panel .detail-grid {
-  grid-template-columns: 1fr;
-}
-
-@media (max-width:900px) {
-
-.discover-grid {
-  grid-template-columns: minmax(0,1fr);
-  grid-template-areas: "filters" "map" "list" "detail";
-  gap: 12px;
-}
-
-.discover-grid .filters-panel,
-.map-stage,
-.list-panel,
-.detail-panel {
-  grid-area: auto;
-  width: 100%;
-  min-width: 0;
-}
-
-.inventory-list {
-  max-height: 420px;
-}
-
-.detail-panel .detail-grid {
-  grid-template-columns: repeat(2,minmax(0,1fr));
-}
-}
-
+/* A 900px block used to sit nested inside this one, so it applied only at 600px
+   and below. It reordered the column to filters, map, list, detail and set
+   grid-area:auto on the card, so on a phone the selected screen's card jumped
+   from above the list to below the whole list. The 1120px block above is the
+   one small-screen layout: filters, map, detail, list. */
 @media (max-width:600px) {
 
 .detail-panel {
   padding: 14px;
-}
-
-.detail-panel .detail-grid {
-  grid-template-columns: 1fr;
-}
 }
 }
 
