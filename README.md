@@ -170,6 +170,12 @@ Map marker and tile positions in `app/component/maplibre-inventory-map.tsx` are 
 
 Discover uses two columns. The filters are one horizontal bar above the map and the result list. The selected screen's detail floats over the map. `.discover-grid` in [`app/component/discover-view.css`](app/component/discover-view.css) is declared twice; the lower rule wins on source order and holds the layout. Keep the column count in every media query equal to the column count in `grid-template-areas`, or a phantom track appears and the map collapses.
 
+A map pin and a result card both select a screen; there is no pin modal. `PlaceComments` in [`app/component/place-panel.tsx`](app/component/place-panel.tsx) renders location comments inside the detail card. The card preview renders `DeviceScreen` on a 1280px stage and scales the whole frame to the card, because `DeviceScreen` sizes its text in `vw` and would overflow a card. A digital screen gets the preview; a static billboard does not.
+
+The floating card sits inside `.detail-dock`, which uses `contain: size`. Keep it. The dock shares the map's grid row, and without containment the card's own height stretched that row, so the card was never capped and ran under the map search bar and past the map. A percentage `max-height` on the card does not help: Chrome does not resolve it for a grid item aligned to the end. Below 1120px the dock returns to normal flow with `contain: none`, or it collapses to zero height.
+
+Known limit: public screens show "ON" instead of "Thunder Bay, ON". `deriveScreenCity` in [`app/component/device-templates.ts`](app/component/device-templates.ts) keeps only the last address part. The profile page, the public playback page and the Discover preview share it, so the fix is one line, but it changes what physical screens display.
+
 The advertiser buying flow shows a three-step indicator in the top bar: Find screens, Book dates, Make an ad. Booking already takes the ad picture, so a person can buy screen time in two steps. Make an ad is a separate task for a campaign that is already booked, and it stays locked until one exists.
 
 Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.

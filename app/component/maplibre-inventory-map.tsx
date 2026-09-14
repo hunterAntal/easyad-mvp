@@ -215,6 +215,23 @@ export default function MapLibreInventoryMap({
     map.easeTo({ center: percentToLngLat(selectedLocation), duration: 500 });
   }, [selectedLocation]);
 
+  // A list click can select a screen that sits outside the current view, so
+  // bring it into view. Only when it is outside: panning on every pin click
+  // would move the map under the cursor, and the first render must keep the
+  // operating-radius fit, which is why the initial selection is skipped.
+  const lastPannedInventoryId = useRef(selectedInventoryId);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectionEnabled || !selectedInventoryId) return;
+    if (lastPannedInventoryId.current === selectedInventoryId) return;
+    lastPannedInventoryId.current = selectedInventoryId;
+    const item = inventory.find((entry) => entry.id === selectedInventoryId);
+    if (!item) return;
+    const target = percentToLngLat(item);
+    if (map.getBounds().contains(target)) return;
+    map.easeTo({ center: target, duration: 500 });
+  }, [inventory, selectedInventoryId, selectionEnabled]);
+
   function selectSearchResult(result: MapSearchResult) {
     setSearchQuery(result.label);
     setSearchOpen(false);

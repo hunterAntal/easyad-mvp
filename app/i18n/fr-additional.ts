@@ -1,4 +1,6 @@
 export const frAdditional: Record<string, string> = {
+  "Comments ({count})": "Commentaires ({count})",
+  "Your ad plays here": "Votre annonce s’affiche ici",
   "Size, file types and tags": "Dimensions, types de fichiers et étiquettes",
   "Buy screen time": "Acheter du temps d’écran",
   "Collapse menu": "Réduire le menu",

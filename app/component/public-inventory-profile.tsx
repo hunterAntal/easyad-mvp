@@ -8,7 +8,7 @@ import { money } from "../utils";
 import DeviceScreen from "./device-screen";
 import DeviceApiGuide from "./device-api-guide";
 import type { DeviceMediaSlide } from "./device-media-carousel";
-import { deviceTemplates, resolveDeviceTemplate } from "./device-templates";
+import { deriveScreenCity, deviceTemplates, resolveDeviceTemplate } from "./device-templates";
 import { getServerI18n } from "../i18n/server";
 import { translate } from "../i18n/messages";
 import type { Locale } from "../i18n/config";
@@ -28,7 +28,7 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
   const spec = formats[inventory.format];
   const template = resolveDeviceTemplate(undefined, inventory.displayTemplate);
   const templateLabel = deviceTemplates.find((entry) => entry.id === template)?.label ?? "Full screen";
-  const city = deriveCity(inventory.address);
+  const city = deriveScreenCity(inventory.address);
   const deviceSlides: DeviceMediaSlide[] = approvedDeviceResources
     .filter((resource) => resource.mediaType === "image" || resource.mediaType === "video")
     .map((resource) => ({
@@ -107,10 +107,6 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
   );
 }
 
-function deriveCity(address: string) {
-  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.length > 1 ? parts.slice(-1)[0] : "Thunder Bay, ON";
-}
 
 function DeviceResourceCard({ resource, locale, formatDate }: { resource: MediaResource; locale: Locale; formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string }) {
   const t = (message: string, variables?: Record<string, string | number>) => translate(locale, message, variables);

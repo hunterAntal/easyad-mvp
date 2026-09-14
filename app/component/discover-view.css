@@ -247,14 +247,39 @@
    the way a map application shows the place you just clicked: the map keeps its
    full size, the list keeps its full height, and the detail is beside the pin
    it describes instead of in a column of its own. */
-.discover-grid .detail-panel {
+/* The dock stretches across the map's grid area, which gives it a height the
+   browser resolves. The card inside it can then be capped. The earlier
+   "max-height: calc(100% - 24px)" on the card was ignored, because Chrome does
+   not resolve a percentage height for a grid item aligned to the end. Measured:
+   the card ran 44px under the map search bar and 11px past the map's bottom.
+   The 70px top clears the search bar (top 14px, height 44px) with a 12px gap. */
+.discover-grid .detail-dock {
+  /* The dock shares the map's grid row, and a row grows to fit its tallest
+     item. Without containment the card's own height stretched the row to
+     723px, the dock stretched to match, and the card never had to shrink.
+     Size containment removes the dock's content from row sizing, so the row
+     stays the map's height and the card is capped inside it. The explicit
+     width below is required, because containment also zeroes intrinsic width. */
+  contain: size;
   z-index: 2;
+  pointer-events: none;
   grid-area: map;
-  align-self: end;
+  align-self: stretch;
   justify-self: start;
-  width: 352px;
-  max-height: calc(100% - 24px);
-  margin: 12px;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 376px;
+  min-height: 0;
+  padding: 70px 12px 12px;
+  display: flex;
+}
+
+.discover-grid .detail-dock .detail-panel {
+  pointer-events: auto;
+  flex: 0 1 auto;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
   overflow: auto;
   box-shadow: var(--shadow);
 }
@@ -356,15 +381,22 @@
   grid-template-rows: auto auto auto auto;
 }
 
-.discover-grid .detail-panel {
+.discover-grid .detail-dock {
+  /* Stacked under the map, the dock must size to its card again. */
+  contain: none;
   z-index: auto;
+  pointer-events: auto;
   grid-area: detail;
   align-self: auto;
   justify-self: auto;
   width: auto;
-  max-height: none;
-  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+.discover-grid .detail-dock .detail-panel {
   overflow: visible;
+  box-shadow: none;
 }
 
 .discover-grid .map-stage .map-legend {
@@ -492,4 +524,57 @@
 
 .detail-more > *:not(summary) {
   margin-top: 10px;
+}
+
+/* Comments sit inside the floating detail card, which already scrolls. The
+   list's own 280px cap and scrollbar came from the old modal; inside the card
+   they would make a scroller inside a scroller. The card scrolls instead. */
+.detail-comments .place-comment-list {
+  flex: none;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  margin-top: 10px;
+}
+
+/* ---- Screen preview in the detail card ------------------------------------
+   The stage is the size the profile page renders the player at; the frame
+   scales it down to the card's width and clips it to 16:9. */
+.detail-preview {
+  aspect-ratio: 16/9;
+  border: 1px solid #1c2c35;
+  border-radius: var(--radius-sm);
+  background: #050708;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.detail-preview-stage {
+  pointer-events: none;
+  transform-origin: 0 0;
+  width: 1280px;
+  height: 720px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.detail-preview-stage .device-player-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Sized for the 1280px stage: at card width this lands near 16px. */
+.detail-preview-empty {
+  color: #cfe0d8;
+  letter-spacing: -.01em;
+  place-items: center;
+  height: 100%;
+  font-size: 64px;
+  font-weight: 600;
+  display: grid;
 }

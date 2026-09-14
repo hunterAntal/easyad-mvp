@@ -2,39 +2,28 @@
 
 import "./place-panel.css";
 import { useEffect, useState } from "react";
-import { formats, type InventoryComment, type InventoryItem } from "../data";
+import type { InventoryComment, InventoryItem } from "../data";
 import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
-import { inventoryAvailabilityLabel } from "../lib/inventory-availability";
-import { isStaticInventory } from "../lib/inventory-delivery";
 
-export default function PlacePanel({
-  item,
-  canComment,
-  onClose,
-}: {
-  item: InventoryItem;
-  canComment: boolean;
-  onClose: () => void;
-}) {
+// Comments about a screen's location. They used to live in a modal that opened
+// only from a map pin, over a detail card that also changed underneath it, and
+// they could not be reached from the result list at all. They now sit inside
+// the detail card, collapsed, so a pin click and a list click do the same thing
+// and the conversation is reachable from both.
+export function PlaceComments({ item, canComment }: { item: InventoryItem; canComment: boolean }) {
   const { formatDate, t } = useI18n();
   const commentsEnabled = item.commentsEnabled !== false;
-  const availability = inventoryAvailabilityLabel(item);
   const [comments, setComments] = useState<InventoryComment[]>([]);
   const [loading, setLoading] = useState(commentsEnabled);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
 
   useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  useEffect(() => {
+    // A new screen is a new conversation, so an unsent draft does not follow it.
+    setDraft("");
     if (!commentsEnabled) {
+      setComments([]);
       setLoading(false);
       return;
     }
@@ -81,76 +70,45 @@ export default function PlacePanel({
     }
   }
 
+  if (!commentsEnabled) return null;
+
   return (
-    <div
-      className="place-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("{name} details", { name: item.name })}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="place-panel">
-        <header className="place-header">
-          <div>
-            <span className="eyebrow">{t(formats[item.format].label)}</span>
-            <strong>{item.name}</strong>
-            <span className="place-address">{item.address}</span>
-            {isStaticInventory(item) ? <span className={`status ${availability === "Available" ? "good" : "bad"}`}>{t(availability)}</span> : null}
-          </div>
-          <button type="button" className="place-close" aria-label={t("Close")} onClick={onClose}>&times;</button>
-        </header>
-
-        <div className="place-photo" role="img" aria-label={t("Photo of {name} (placeholder)", { name: item.name })}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <circle cx="8.5" cy="10" r="1.6" />
-            <path d="M21 16l-5-5L7 19" />
-          </svg>
-          <span>{t("Photo coming soon")}</span>
-        </div>
-
-        {commentsEnabled ? (
-          <section className="place-comments">
-            <h3>{t("Comments")}</h3>
-            <div className="place-comment-list">
-              {loading ? (
-                <div className="place-comment-empty"><span className="async-spinner" /></div>
-              ) : comments.length ? (
-                comments.map((comment) => (
-                  <div className="place-comment" key={comment.id}>
-                    <div className="place-comment-meta">
-                      <strong>{comment.authorName}</strong>
-                      <span>{formatDate(comment.createdAt)}</span>
-                    </div>
-                    <p>{comment.body}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="place-comment-empty">{t("No comments yet. Be the first to share what you know about this spot.")}</div>
-              )}
+    <details className="detail-more detail-comments">
+      <summary>{t(loading || !comments.length ? "Comments" : "Comments ({count})", { count: comments.length })}</summary>
+      <div className="place-comment-list">
+        {loading ? (
+          <div className="place-comment-empty"><span className="async-spinner" /></div>
+        ) : comments.length ? (
+          comments.map((comment) => (
+            <div className="place-comment" key={comment.id}>
+              <div className="place-comment-meta">
+                <strong>{comment.authorName}</strong>
+                <span>{formatDate(comment.createdAt)}</span>
+              </div>
+              <p>{comment.body}</p>
             </div>
-            {canComment ? (
-              <form className="place-comment-form" noValidate onSubmit={submit}>
-                <textarea
-                  className="resize-none"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder={t("Add a comment about this location...")}
-                  maxLength={1000}
-                  rows={2}
-                  disabled={posting}
-                  aria-label={t("Add a comment")}
-                />
-                <button type="submit" className="primary-button" disabled={posting || !draft.trim()}>{t(posting ? "Posting..." : "Post")}</button>
-              </form>
-            ) : (
-              <p className="place-comment-signin">{t("Sign in to join the conversation.")}</p>
-            )}
-          </section>
-        ) : null}
+          ))
+        ) : (
+          <div className="place-comment-empty">{t("No comments yet. Be the first to share what you know about this spot.")}</div>
+        )}
       </div>
-    </div>
+      {canComment ? (
+        <form className="place-comment-form" noValidate onSubmit={submit}>
+          <textarea
+            className="resize-none"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t("Add a comment about this location...")}
+            maxLength={1000}
+            rows={2}
+            disabled={posting}
+            aria-label={t("Add a comment")}
+          />
+          <button type="submit" className="primary-button" disabled={posting || !draft.trim()}>{t(posting ? "Posting..." : "Post")}</button>
+        </form>
+      ) : (
+        <p className="place-comment-signin">{t("Sign in to join the conversation.")}</p>
+      )}
+    </details>
   );
 }
