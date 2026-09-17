@@ -10,6 +10,7 @@ import { money } from "../utils";
 import { PanelHeading } from "./shared-ui";
 import SecretInput from "./secret-input";
 import { useI18n } from "../i18n/client";
+import LocalDateTime from "./local-date-time";
 
 type ManagedRole = Exclude<Role, "admin">;
 
@@ -158,7 +159,7 @@ export default function AccountManagementView({
       <div className="panel account-detail-panel">
         {selectedUser ? <>
           <PanelHeading eyebrow="Selected account" title={selectedUser.name} action={<span className={`status ${selectedUser.status === "banned" ? "bad" : "good"}`}>{t(selectedUser.status)}</span>} />
-          <div className="account-identity"><span>{selectedUser.email}</span><small>{t("Created {date}", { date: formatDate(selectedUser.createdAt) })}</small></div>
+          <div className="account-identity"><span>{selectedUser.email}</span><small><LocalDateTime value={selectedUser.createdAt} template="Created {date}" /></small></div>
           <div className="account-controls">
             <label>{t("Workspace role")}<select className="select" value={role} disabled={saving} onChange={(event) => setRole(event.target.value as ManagedRole)}>{managedRoleOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
             <label>{t("Account access")}<select className="select" value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as DbUser["status"])}><option value="active">{t("Active")}</option><option value="banned">{t("Banned")}</option></select></label>

@@ -24,6 +24,13 @@ export const mapBounds = {
   south: 10,
 };
 
+// In-app links keep a real href and switch the view client-side on a plain
+// left click only. A modified click (Cmd, Ctrl, Shift, Alt) or a middle click
+// is left to the browser, so "open in new tab" still works.
+export function isPlainLeftClick(event: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean }) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !event.defaultPrevented;
+}
+
 export function portalHref(role: Role, view: View) {
   return `/?role=${role}&view=${view}`;
 }
@@ -223,8 +230,13 @@ export function templateTitle(template: CreativeDraft["template"]) {
   return { retail: "Save 30% In Store", finance: "Better Banking Nearby", event: "City Nights Festival" }[template];
 }
 
+// The local calendar date as YYYY-MM-DD. It used toISOString, which is the UTC
+// date: after 8 pm in Toronto "today" was already tomorrow, so a booking that
+// ends today read as over and tomorrow's booking played early.
 export function toDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function pointToLngLat(point: { x: number; y: number }): [number, number] {

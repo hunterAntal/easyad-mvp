@@ -9,6 +9,7 @@ import { EditorInput, Meter, PanelHeading } from "./shared-ui";
 import PreciseLocationPicker from "./precise-location-picker";
 import { deviceTemplates } from "./device-templates";
 import AsyncButton from "./async-button";
+import LocalDateTime from "./local-date-time";
 import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
 import { localeNames, locales } from "../i18n/config";
@@ -324,13 +325,29 @@ function MediaUploadForm({ uploadMedia }: { uploadMedia: (file: File, title: str
 
 export function CalendarView({ inventory, bookings }: { inventory: InventoryItem[]; bookings: Booking[] }) {
   const { formatDate, t } = useI18n();
-  const weeks = Array.from({ length: 8 }, (_, index) => new Date(2026, 5, 22 + index * 7));
+  // Eight weeks from the Monday of this week. The weeks were fixed at 22 June
+  // 2026, so the schedule showed only past weeks, all "Available". Today is read
+  // after mount: the server runs in UTC and would print different dates.
+  const [firstWeek, setFirstWeek] = useState<Date | null>(null);
+  useEffect(() => {
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    setFirstWeek(monday);
+  }, []);
+  const weeks = firstWeek
+    ? Array.from({ length: 8 }, (_, index) => {
+      const week = new Date(firstWeek);
+      week.setDate(firstWeek.getDate() + index * 7);
+      return week;
+    })
+    : [];
   return (
     <section className="panel">
       <PanelHeading eyebrow="Calendar and availability" title="Campaign schedule" />
       <div className="calendar">
         <div className="calendar-head"><span>{t("Inventory")}</span>{weeks.map((week) => <span key={week.toISOString()}>{formatDate(week, { month: "short", day: "numeric" })}</span>)}</div>
-        {inventory.map((item) => <div className="calendar-row" key={item.id}><strong>{item.name}</strong>{weeks.map((_, index) => <CalendarCell item={item} index={index} bookings={bookings} key={index} />)}</div>)}
+        {inventory.map((item) => <div className="calendar-row" key={item.id}><strong>{item.name}</strong>{weeks.map((week) => <CalendarCell item={item} weekStart={week} bookings={bookings} key={week.toISOString()} />)}</div>)}
       </div>
     </section>
   );
@@ -367,7 +384,9 @@ export function ApprovalsView({
         <div className="approval-list">
           {pending.length || pendingDeviceMedia.length ? <>
           {pending.map((booking) => {
-            const item = inventory.find((unit) => unit.id === booking.inventoryId) ?? inventory[0];
+            // No fallback to the first device: a booking whose device was
+            // deleted showed another device's name, or crashed with none left.
+            const item = inventory.find((unit) => unit.id === booking.inventoryId);
             const conflict = hasConflict(booking.inventoryId, booking.start, booking.end, booking.id);
             const creative = creatives.find((entry) => entry.bookingId === booking.id);
             return (
@@ -375,7 +394,7 @@ export function ApprovalsView({
                 <div>
                   <span className="eyebrow">{booking.advertiser}</span>
                   <strong>{booking.campaign}</strong>
-                  <small>{item.name} - {booking.start} {t("to")} {booking.end}</small>
+                  <small>{item?.name ?? booking.inventoryId} - {booking.start} {t("to")} {booking.end}</small>
                   <small>{t(booking.adSlots === 1 ? "{count} ad slot reserved for this device loop" : "{count} ad slots reserved for this device loop", { count: booking.adSlots })}</small>
                   <small>{creative ? t("Creative: {source} {width}x{height} {type}", { source: creative.source === "upload" ? creative.originalName ?? t("Uploaded media") : t(capitalize(creative.template)), width: creative.width, height: creative.height, type: creative.fileType.toUpperCase() }) : t("Creative: not submitted yet")}</small>
                   {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a></small> : null}
@@ -441,7 +460,7 @@ export function ApprovalsView({
               <span className={`status ${event.action === "approved" ? "good" : "bad"}`}>{t(event.action)}</span>
               <span><strong>{event.campaign}</strong><small>{event.bookingId} - {event.inventoryId}</small></span>
               <span>{t(event.previousStatus)}<small>{t("to")} {t(event.nextStatus)}</small></span>
-              <span>{event.actorName}<small>{formatDate(event.createdAt, { dateStyle: "medium", timeStyle: "short" })}</small></span>
+              <span>{event.actorName}<small><LocalDateTime value={event.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} /></small></span>
             </div>
           )) : (
             <div className="empty-state"><strong>{t("No approval history yet")}</strong><span>{t("Approved and rejected campaigns will appear here for tracking.")}</span></div>
@@ -453,11 +472,22 @@ export function ApprovalsView({
   );
 }
 
-function CalendarCell({ item, index, bookings }: { item: InventoryItem; index: number; bookings: Booking[] }) {
+function CalendarCell({ item, weekStart, bookings }: { item: InventoryItem; weekStart: Date; bookings: Booking[] }) {
   const { t } = useI18n();
-  const weekStart = new Date(2026, 5, 22 + index * 7);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const booking = bookings.find((entry) => entry.inventoryId === item.id && overlaps(toDate(weekStart), toDate(weekEnd), entry.start, entry.end));
-  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? booking.status.split(" ")[0] : "Available")}</span>;
+  // A short label per status. It printed the first word of the status, so a
+  // cell read "pending" or "creative", untranslated even in French.
+  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? calendarStatusLabels[booking.status] ?? capitalize(booking.status) : "Available")}</span>;
 }
+
+const calendarStatusLabels: Record<string, string> = {
+  "pending approval": "Pending",
+  "creative review": "In review",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  live: "Live",
+  completed: "Completed",
+  rejected: "Rejected",
+};

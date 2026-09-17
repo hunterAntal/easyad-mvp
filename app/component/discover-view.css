@@ -291,11 +291,24 @@
 /* The map legend would sit under the floating card, so it moves aside. */
 .discover-grid .map-stage .map-legend {
   left: 380px;
+  /* Only the space beside the card. At 1121-1380px with the full sidebar the
+     map is about 517px wide and the one-line legend ran past its edge. */
+  max-width: calc(100% - 394px);
 }
 
+.discover-grid .map-stage .map-legend span {
+  white-space: normal;
+}
+
+/* The list fills what the panel heading leaves. A fixed max-height (582px, or
+   362px at 1120px) plus the 65px heading was taller than the panel's own
+   max-height, which clips, so the last card and the end of the scrollbar could
+   not be reached. */
 .inventory-list {
   gap: 0;
-  max-height: 582px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   padding: 6px;
   overflow-y: auto;
 }
@@ -401,6 +414,7 @@
 
 .discover-grid .map-stage .map-legend {
   left: 14px;
+  max-width: calc(100% - 28px);
 }
 
 .filters-panel {
@@ -408,51 +422,19 @@
 }
 
 .inventory-list {
-  max-height: 362px;
+  max-height: none;
 }
 }
 
-@media (max-width:600px) {
-
-.detail-panel .detail-grid {
-  grid-template-columns: 1fr;
-}
-
-@media (max-width:900px) {
-
-.discover-grid {
-  grid-template-columns: minmax(0,1fr);
-  grid-template-areas: "filters" "map" "list" "detail";
-  gap: 12px;
-}
-
-.discover-grid .filters-panel,
-.map-stage,
-.list-panel,
-.detail-panel {
-  grid-area: auto;
-  width: 100%;
-  min-width: 0;
-}
-
-.inventory-list {
-  max-height: 420px;
-}
-
-.detail-panel .detail-grid {
-  grid-template-columns: repeat(2,minmax(0,1fr));
-}
-}
-
+/* A 900px block used to sit nested inside this one, so it applied only at 600px
+   and below. It reordered the column to filters, map, list, detail and set
+   grid-area:auto on the card, so on a phone the selected screen's card jumped
+   from above the list to below the whole list. The 1120px block above is the
+   one small-screen layout: filters, map, detail, list. */
 @media (max-width:600px) {
 
 .detail-panel {
   padding: 14px;
-}
-
-.detail-panel .detail-grid {
-  grid-template-columns: 1fr;
-}
 }
 }
 
@@ -541,31 +523,18 @@
    The stage is the size the profile page renders the player at; the frame
    scales it down to the card's width and clips it to 16:9. */
 .detail-preview {
-  aspect-ratio: 16/9;
   border: 1px solid #1c2c35;
   border-radius: var(--radius-sm);
   background: #050708;
   width: 100%;
   max-width: 100%;
   margin-bottom: 12px;
-  position: relative;
   overflow: hidden;
 }
 
-.detail-preview-stage {
+/* The card preview is a thumbnail, not a control. */
+.detail-preview .device-preview-stage {
   pointer-events: none;
-  transform-origin: 0 0;
-  width: 1280px;
-  height: 720px;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.detail-preview-stage .device-player-preview {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
 }
 
 /* Sized for the 1280px stage: at card width this lands near 16px. */

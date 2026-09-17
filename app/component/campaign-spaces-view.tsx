@@ -20,9 +20,10 @@ export default function CampaignSpacesView({
   onOpenCreative: (booking: Booking) => void;
 }) {
   const { locale, t } = useI18n();
-  const visibleBookings = bookings
-    .filter((booking) => booking.status !== "rejected")
-    .filter((booking) => !currentUser || currentUser.role === "admin" || booking.advertiser === currentUser.name);
+  // No filter by account name: the server already returns only this account's
+  // bookings. Matching the free-text advertiser name hid every older booking
+  // once an account was renamed.
+  const visibleBookings = bookings.filter((booking) => booking.status !== "rejected");
   // Admin sees this screen too, and "find screens near you" is not their job.
   const isAdvertiser = currentUser?.role === "advertiser";
 

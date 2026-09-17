@@ -20,6 +20,10 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  // The load handler runs once, after the first render. It must place the
+  // marker at the current point, not at the point from that first render.
+  const pointRef = useRef(point);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const canvas = document.createElement("canvas");
@@ -48,7 +52,7 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
         const markerIcon = document.createElement("i");
         markerIcon.className = "precise-location-marker";
         markerElement.append(markerIcon);
-        markerRef.current = new maplibregl.Marker({ element: markerElement, anchor: "bottom" }).setLngLat(pointToLngLat(point)).addTo(map);
+        markerRef.current = new maplibregl.Marker({ element: markerElement, anchor: "bottom" }).setLngLat(pointToLngLat(pointRef.current)).addTo(map);
       });
       map.on("contextmenu", (event) => {
         event.originalEvent.preventDefault();
@@ -72,8 +76,14 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
     }
   }, []);
 
+  // Selecting another device moved only the marker, often off the visible map,
+  // which then showed an empty area. The map follows when the point is out of view.
   useEffect(() => {
-    markerRef.current?.setLngLat(pointToLngLat(point));
+    pointRef.current = point;
+    const lngLat = pointToLngLat(point);
+    markerRef.current?.setLngLat(lngLat);
+    const map = mapRef.current;
+    if (map && !map.getBounds().contains(lngLat)) map.easeTo({ center: lngLat, duration: 400 });
   }, [point]);
 
   function setFallbackPoint(event: React.MouseEvent<HTMLDivElement>) {

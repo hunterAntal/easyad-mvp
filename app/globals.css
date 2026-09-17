@@ -46,6 +46,9 @@
   --z-dropdown: 200;
   --z-popover: 300;
   --z-header: 400;
+  /* The assistant sits above page chrome but below every dialog backdrop and
+     every toast. At 9998 it covered dialogs and hid its own error toasts. */
+  --z-assistant: 450;
   --z-backdrop: 500;
   --z-dialog: 600;
   --z-sheet: 700;
@@ -194,6 +197,12 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
   height: 8px;
 }
 
+/* Set by LanguageSelector when the right-anchored menu would leave the screen. */
+.language-menu.language-menu--start {
+  left: 0;
+  right: auto;
+}
+
 .language-option {
   display: flex;
   align-items: center;
@@ -300,14 +309,17 @@ label {
   display: grid;
 }
 
+/* The scale property, not transform. As transform this rule (0,2,1) replaced
+   the translateY(-50%) that centres the carousel arrows and the fallback map
+   markers, so a pressed arrow dropped 23-32px and the click could be lost. */
 button:not(:disabled):active {
-  transform: scale(.97);
+  scale: .97;
 }
 
 @media (prefers-reduced-motion:reduce) {
 
 button:not(:disabled):active {
-  transform: none;
+  scale: none;
 }
 }
 
@@ -396,4 +408,29 @@ span,
 small,
 strong {
   letter-spacing: 0;
+}
+
+/* Public device URL box. Used by the public inventory page and by the Inventory
+   editor in the workspace. It lived in public-inventory-profile.css, which the
+   workspace never loads, so there the label and both links ran together and
+   read as one URL, and the links overlapped when they wrapped. */
+.public-url-box {
+  background: var(--soft-blue);
+  border: 1px solid #cbd8e8;
+  border-radius: 8px;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 14px;
+  padding: 12px;
+  display: grid;
+}
+
+.public-url-box a {
+  color: var(--blue);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: .85rem;
+  font-weight: 850;
+  overflow: hidden;
 }

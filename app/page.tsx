@@ -6,8 +6,10 @@ import type { CreativeDraft, Filters } from "./types";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import TorontoStarter from "./component/toronto-starter";
-import { INTRO_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
+
+import { INTRO_COOKIE_NAME, SIDEBAR_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
 import { CONSENT_COOKIE_NAME } from "./lib/cookie-consent";
+
 import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
 import GovernmentAccessDenied from "./component/government-access-denied";
 import { getFeatureFlags } from "./lib/feature-flags";
@@ -41,8 +43,13 @@ export default async function Page({ searchParams }: PageProps) {
   const requestedRole = isGovernmentSurface ? user?.role : isRole(role) ? role : user?.role;
   const requestedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
   const cookieStore = await cookies();
-  const introPreference = cookieStore.get(CONSENT_COOKIE_NAME)?.value === "v1.preferences" ? cookieStore.get(INTRO_COOKIE_NAME)?.value : undefined;
-  const showStarter = !isGovernmentSurface && shouldShowStarter(requestedView, introPreference);
+
+  // The starter is the ad buyer's "Start my campaign" screen. Operators and
+  // institution owners reach the portal too (the sidebar's "Open EasyAD
+  // Platform"), and were shown advertiser marketing before their own portal.
+  const starterAudience = !user || user.role === "advertiser";
+  const showStarter = !isGovernmentSurface && starterAudience && shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
+
 
   if (!user && (isGovernmentSurface || requestedView !== "portal")) {
     const destination = isGovernmentSurface ? governmentPathFromParams(params) : queryFromParams(params);
@@ -109,6 +116,7 @@ export default async function Page({ searchParams }: PageProps) {
         initialInstitutionOperators={institutionOperators}
         initialRole={effectiveRole}
         initialView={effectiveView}
+        initialNavCollapsed={cookieStore.get(SIDEBAR_COOKIE_NAME)?.value === "1"}
         initialFormat={isFormat(format) ? format : undefined}
         initialLocationId={isLocation(locationId) ? locationId : undefined}
         initialArea={areaX !== undefined && areaY !== undefined ? { x: areaX, y: areaY } : undefined}

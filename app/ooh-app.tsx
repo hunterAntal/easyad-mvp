@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isRoleValue, isViewValue } from "./roles";
 import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, locations } from "./data";
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
@@ -40,6 +41,7 @@ export default function OohApp({
   initialInstitutionOperators = [],
   initialRole = "advertiser",
   initialView = "portal",
+  initialNavCollapsed = false,
   initialFormat,
   initialFilters,
   initialLocationId,
@@ -64,6 +66,7 @@ export default function OohApp({
   initialInstitutionOperators?: DbUser[];
   initialRole?: Role;
   initialView?: View;
+  initialNavCollapsed?: boolean;
   initialFormat?: FormatKey;
   initialFilters?: Partial<Filters>;
   initialLocationId?: string;
@@ -77,9 +80,12 @@ export default function OohApp({
   surface?: "marketplace" | "government";
 }) {
   const { t } = useI18n();
-  // Starts expanded on the server and the first client render so the markup
-  // matches, then adopts the remembered choice.
-  const [navCollapsed, setNavCollapsed] = useState(false);
+  // The server reads the remembered choice from the cookie and passes it in, so
+  // the first paint already has the right sidebar. Starting expanded and
+  // adopting the cookie after mount painted a 244px sidebar that then snapped
+  // to the 76px rail on a slow load. The effect below still reads the cookie,
+  // for a page the server rendered without it.
+  const [navCollapsed, setNavCollapsed] = useState(initialNavCollapsed);
   useEffect(() => {
     if (readBrowserPreference(SIDEBAR_COOKIE_NAME) === "1") setNavCollapsed(true);
   }, []);
@@ -92,6 +98,39 @@ export default function OohApp({
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
   const [role, setRole] = useState<Role>(startingRole);
   const [view, setView] = useState<View>(initialView);
+
+  // The address follows the view. It used to stay on the first page loaded, so
+  // reload went back to that page, Back left the app, and a copied link opened
+  // the wrong view. The ref holds what the address already says: the server
+  // made it match on load, and Back updates it before changing the view, so
+  // neither a double-run effect nor a Back press pushes an extra entry.
+  const addressState = useRef({ role, view });
+  useEffect(() => {
+    if (addressState.current.role === role && addressState.current.view === view) return;
+    addressState.current = { role, view };
+    const url = new URL(window.location.href);
+    if (surface === "government") url.searchParams.delete("role");
+    else url.searchParams.set("role", role);
+    url.searchParams.set("view", view);
+    if (url.href !== window.location.href) window.history.pushState(window.history.state, "", url);
+  }, [role, surface, view]);
+
+  // Back and Forward restore the view, and the role where it can change.
+  useEffect(() => {
+    function restoreFromAddress() {
+      const params = new URLSearchParams(window.location.search);
+      const requestedView = params.get("view");
+      const requestedRole = params.get("role");
+      const nextView = isViewValue(requestedView) ? requestedView : initialView;
+      const canChangeRole = surface !== "government" && (!currentUser || currentUser.role === "admin");
+      const nextRole = canChangeRole && isRoleValue(requestedRole) ? requestedRole : startingRole;
+      addressState.current = { role: nextRole, view: nextView };
+      setRole(nextRole);
+      setView(nextView);
+    }
+    window.addEventListener("popstate", restoreFromAddress);
+    return () => window.removeEventListener("popstate", restoreFromAddress);
+  }, [currentUser, initialView, startingRole, surface]);
   const [selectedLocationId, setSelectedLocationId] = useState(
     initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
   );
@@ -193,7 +232,14 @@ export default function OohApp({
         .sort((a, b) => a.distance - b.distance),
     [filters, inventory, selectedLocation],
   );
-  const selectedInventory = visibleInventory.find((item) => item.id === selectedInventoryId) ?? visibleInventory[0] ?? inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0];
+  // Only Find screens and Book dates choose from the filtered list. Inventory
+  // and the other management views list every device, and used to search the
+  // radius-filtered list first: clicking a device outside the radius
+  // highlighted its row while the form showed another device, and Save failed.
+  const selectsFromFilteredList = view === "discover" || view === "booking";
+  const selectedInventory = selectsFromFilteredList
+    ? visibleInventory.find((item) => item.id === selectedInventoryId) ?? visibleInventory[0] ?? inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0]
+    : inventory.find((item) => item.id === selectedInventoryId) ?? inventory[0];
   const canManageInventory = currentUser?.role === "operator" || currentUser?.role === "institutional" || currentUser?.role === "admin";
   const canDeleteInventory = currentUser?.role === "admin";
   const canBuyAds = currentUser?.role === "advertiser" || currentUser?.role === "admin";
@@ -546,6 +592,7 @@ export default function OohApp({
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
           <BookingView
+            advertiserNameFixed={currentUser?.role === "advertiser"}
             item={selectedInventory}
             inventory={inventory}
             draft={bookingDraft}

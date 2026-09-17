@@ -5,7 +5,8 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, FileImage, Film, Image as ImageIcon, Layers3, Search, Trash2, X } from "lucide-react";
 import type { Booking, Creative, InventoryItem, MediaResource } from "../data";
 import type { DbUser } from "../lib/db";
-import { capitalize } from "../utils";
+import { capitalize, toDate } from "../utils";
+import { useMounted } from "./device-widgets";
 import AsyncButton from "./async-button";
 import { PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
@@ -41,6 +42,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   onOpenInventory: (inventoryId: string) => void;
 }) {
   const { formatDate, formatNumber, t } = useI18n();
+  // "Added" is a timestamp. Formatted during the server render it used the
+  // server's zone and differed from the browser's text.
+  const mounted = useMounted();
   const isAdvertiser = currentUser?.role === "advertiser";
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -48,6 +52,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const items = useMemo(() => buildLibraryItems(inventory, bookings, creatives, mediaResources), [inventory, bookings, creatives, mediaResources]);
+  // The empty state said "No matching resources, adjust the search or filters"
+  // even when nothing was searched or filtered, to an account with no content.
+  const filtering = query.trim() !== "" || typeFilter !== "all" || statusFilter !== "all";
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return items.filter((item) => typeFilter === "all" || item.mediaType === typeFilter)
@@ -76,13 +83,15 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
           {filtered.length ? filtered.map((item) => <button className={`cms-resource-card${selected?.id === item.id ? " selected" : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button">
             <ResourcePreview item={item} />
             <span className="cms-resource-copy"><strong>{item.title}</strong><small>{item.inventoryName}</small><span className={`status cms-status ${item.status}`}>{t(item.statusLabel)}</span></span>
-          </button>) : <div className="empty-state cms-empty"><strong>{t(isAdvertiser ? "Nothing here yet" : "No matching resources")}</strong><span>{t(isAdvertiser ? "Pictures you send with a booking appear here. Change the search or the filters to see more." : "Adjust the search or filters to see more of your content.")}</span></div>}
+          </button>) : <div className="empty-state cms-empty"><strong>{t(isAdvertiser ? "Nothing here yet" : filtering ? "No matching resources" : "No resources yet")}</strong><span>{t(isAdvertiser
+            ? filtering ? "Pictures you send with a booking appear here. Change the search or the filters to see more." : "Pictures you send with a booking appear here."
+            : filtering ? "Adjust the search or filters to see more of your content." : "Upload device media or submit campaign creative to begin building this library.")}</span></div>}
         </div>
         <aside className="cms-detail" aria-label={t("Selected resource details")}>
           {selected ? <>
             <ResourcePreview item={selected} large />
             <div className="cms-detail-heading"><span className={`status cms-status ${selected.status}`}>{t(selected.statusLabel)}</span><h3>{selected.title}</h3><p>{selected.subtitle}</p></div>
-            <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={formatDate(selected.createdAt)} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
+            <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={mounted ? formatDate(selected.createdAt) : ""} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
             <div className="cms-detail-actions">
               {selected.publicUrl ? <a className="secondary-button" href={selected.publicUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open")}</a> : null}
               {selected.booking && (currentUser?.role === "advertiser" || currentUser?.role === "admin") ? <button className="secondary-button" onClick={() => onOpenCreative(selected.booking!)} type="button">{t("Edit creative")}</button> : null}
@@ -138,7 +147,7 @@ export function buildLibraryItems(inventory: InventoryItem[], bookings: Booking[
 }
 
 function creativeStatus(booking: Booking, creative: Creative): { key: ResourceStatus; label: string } {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDate(new Date()); // local date, not the UTC date
   if (booking.status === "rejected" || booking.status === "completed" || booking.end < today || creative.status === "needs changes") return { key: "inactive", label: creative.status === "needs changes" ? "Needs changes" : capitalize(booking.status) };
   if (creative.status === "pending review" || booking.status === "pending approval" || booking.status === "creative review") return { key: "review", label: creative.status === "pending review" ? "In review" : capitalize(booking.status) };
   if (booking.start > today || booking.status === "scheduled") return { key: "scheduled", label: "Scheduled" };

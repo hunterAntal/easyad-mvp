@@ -107,8 +107,10 @@
 .government-about-network-list span { font-weight: 800; line-height: 1.35; }
 .government-about-network-list small { color: #82969e; font-size: .63rem; }
 .government-about-network-list .is-selected small { color: #74d7b1; }
-.government-about-screen-wrap { background: linear-gradient(145deg,#1b2b33,#102028); align-content: center; min-width: 0; padding: clamp(18px,3vw,38px); display: grid; }
-.government-about-screen { aspect-ratio: 16/9; color: #122027; background: linear-gradient(135deg,#d9e9e2,#b6d2e9); border: 8px solid #0b1013; align-content: end; gap: 5px; padding: clamp(15px,3vw,30px); box-shadow: 0 18px 42px #00000052; display: grid; }
+/* An implicit auto column let the 16:9 screen grow to fit its heading and
+   break out of the console card at 1041-1320px (and 1440px in French). */
+.government-about-screen-wrap { background: linear-gradient(145deg,#1b2b33,#102028); align-content: center; grid-template-columns: minmax(0,1fr); min-width: 0; padding: clamp(18px,3vw,38px); display: grid; }
+.government-about-screen { min-width: 0; aspect-ratio: 16/9; color: #122027; background: linear-gradient(135deg,#d9e9e2,#b6d2e9); border: 8px solid #0b1013; align-content: end; gap: 5px; padding: clamp(15px,3vw,30px); box-shadow: 0 18px 42px #00000052; display: grid; }
 .government-about-screen span { color: #1d5e49; text-transform: uppercase; letter-spacing: .08em; font-size: .6rem; font-weight: 900; }
 .government-about-screen strong { max-width: 12ch; font-size: clamp(1.35rem,3vw,2.5rem); line-height: .95; }
 .government-about-screen small { color: #435b63; font-size: .65rem; }

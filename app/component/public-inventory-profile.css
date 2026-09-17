@@ -1,30 +1,15 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
-.public-url-box {
-  background: var(--soft-blue);
-  border: 1px solid #cbd8e8;
-  border-radius: 8px;
-  gap: 6px;
-  margin-bottom: 14px;
-  padding: 12px;
-  display: grid;
-}
-
-.public-url-box a {
-  color: var(--blue);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: .85rem;
-  font-weight: 850;
-  overflow: hidden;
-}
-
+/* The floating language selector is fixed at the top right (38px tall at 14px,
+   or 9px below 720px) and this page reserved no room for it. At 701-1200px it
+   covered the "Device URL" action. The top padding keeps the hero below it. */
 .public-device-page {
   background: #f5f7f6;
   align-content: start;
   gap: 22px;
   min-height: 100vh;
   padding: clamp(18px,4vw,56px);
+  padding-top: max(clamp(18px,4vw,56px), 64px);
   display: grid;
 }
 
@@ -108,21 +93,14 @@
   display: grid;
 }
 
+/* The 16:9 shape and the scaling live in ScaledDevicePreview. */
 .public-device-preview {
-  aspect-ratio: 16/9;
   border-radius: var(--radius-sm);
   background: #050708;
   border: 1px solid #1c2c35;
   width: 100%;
-  min-height: 280px;
   overflow: hidden;
   box-shadow: 0 16px 36px #18293029;
-}
-
-.public-device-preview .device-player-preview {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
 }
 
 .public-section-heading h2 {
@@ -214,6 +192,9 @@
 .public-device-page {
   gap: 16px;
   padding: 18px 14px 28px;
+  /* After the shorthand: room for the floating language selector (top 9px,
+     38px tall below 720px), which otherwise covered the page title. */
+  padding-top: 64px;
   overflow-x: clip;
 }
 

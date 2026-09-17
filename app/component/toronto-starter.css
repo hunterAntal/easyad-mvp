@@ -344,3 +344,27 @@ body.starter-active .chatbot-panel {
   .toronto-starter-action > * { animation: none; opacity: 1; }
   .starter-eyebrow i { animation: none; }
 }
+
+/* The starter's own language control, top right. The map's navigation control
+   moves down to make room for it. */
+.toronto-starter-language {
+  position: absolute;
+  z-index: 4;
+  top: 24px;
+  right: 24px;
+}
+
+.toronto-starter .maplibregl-ctrl-top-right {
+  top: 64px;
+}
+
+/* On phones the bottom-right attribution printed over "Don't show this screen
+   again". It moves to the top left, under the brand. */
+@media (max-width: 560px) {
+  .toronto-starter .maplibregl-ctrl-bottom-right {
+    top: 92px;
+    right: auto;
+    bottom: auto;
+    left: 0;
+  }
+}

@@ -57,7 +57,7 @@
 }
 
 .booking-creative-summary.bad {
-  color: var(--danger);
+  color: var(--state-danger);
 }
 
 @media (max-width:900px) {

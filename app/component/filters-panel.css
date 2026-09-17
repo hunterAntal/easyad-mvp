@@ -97,13 +97,14 @@
 }
 }
 
+/* Not sticky. This rule came from the old left-column layout and had no media
+   query, so it beat the reset in the 900px block above. The filters are now a
+   row above the map: sticky, the bar floated over the list while scrolling,
+   slid under the map and the phone top bar, and with "More filters" open got
+   its own scrollbar. */
 .discover-grid .filters-panel {
-  max-height: calc(100vh - 28px);
   box-shadow: none;
   align-self: start;
-  position: sticky;
-  top: 14px;
-  overflow: auto;
 }
 
 .filter-stack {
@@ -162,16 +163,6 @@
 
 .filter-stack {
   grid-template-columns: 1fr;
-}
-
-@media (max-width:900px) {
-
-.discover-grid .filters-panel {
-  max-height: none;
-  position: static;
-  top: auto;
-  overflow: visible;
-}
 }
 
 .tag-filter-field,

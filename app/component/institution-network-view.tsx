@@ -6,13 +6,14 @@ import { AlertTriangle, ExternalLink, Images, MapPinned, MonitorUp, Radio, Shiel
 import type { Booking, Creative, DeviceAlert, DeviceAlertType, InventoryItem, MediaResource } from "../data";
 import { deviceTemplates, resolveDeviceTemplate } from "./device-templates";
 import type { DeviceMediaSlide } from "./device-media-carousel";
-import DeviceScreen from "./device-screen";
+import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import { PanelHeading } from "./shared-ui";
 import AppDialog from "./app-dialog";
 import { toast } from "./toast";
 import { useExpiringClock } from "./use-expiring-clock";
 import { useI18n } from "../i18n/client";
+import { toDate } from "../utils";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import PlayerControl from "./player-control";
 
@@ -170,9 +171,9 @@ export default function InstitutionNetworkView({
             action={<span className={`status ${selectedAlert ? "bad" : isPublished ? "good" : ""}`}>{t(selectedAlert ? "Override active" : isPublished ? "Published" : "Unpublished")}</span>}
           />
           <div className="network-preview-note"><Radio aria-hidden="true" /><span>{t("Content preview, not a live camera feed")}</span></div>
-          <div className="network-screen-frame">
+          <ScaledDevicePreview className="network-screen-frame">
             <DeviceScreen inventoryName={selected.name} city={deriveCity(selected.address)} imageInterval={selected.imageInterval} slides={slides} template={template} displayLanguage={selected.displayLanguage ?? "en"} activeAlert={selectedAlert} preview />
-          </div>
+          </ScaledDevicePreview>
           <div className="network-device-meta">
             <div><span>{t("Template")}</span><strong>{t(templateLabel)}</strong></div>
             <div><span>{t("Approved content")}</span><strong>{t(selectedApprovedResources.length === 1 ? "{count} item" : "{count} items", { count: selectedApprovedResources.length })}</strong></div>
@@ -370,7 +371,7 @@ function emptyAlertDraft(selectedDeviceId: string, published: InventoryItem[]): 
 
 function deviceSlides(selected: InventoryItem, mediaResources: MediaResource[], bookings: Booking[], creatives: Creative[]): DeviceMediaSlide[] {
   const mediaSlides = mediaResources.filter((resource) => resource.inventoryId === selected.id && resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video")).map((resource) => ({ id: resource.id, title: resource.title, subtitle: resource.originalName, mediaType: resource.mediaType as "image" | "video", publicUrl: resource.publicUrl, createdAt: resource.createdAt }));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDate(new Date()); // local date, not the UTC date
   const bookingMap = new Map(bookings.filter((booking) => booking.inventoryId === selected.id && booking.start <= today && booking.end >= today && ["approved", "scheduled", "live"].includes(booking.status)).map((booking) => [booking.id, booking]));
   const creativeSlides = creatives.filter((creative) => creative.status === "approved" && Boolean(creative.publicUrl) && bookingMap.has(creative.bookingId)).map((creative) => { const booking = bookingMap.get(creative.bookingId)!; return { id: creative.id, title: booking.campaign, subtitle: booking.advertiser, mediaType: creative.mimeType?.startsWith("video/") ? "video" as const : "image" as const, publicUrl: creative.publicUrl!, createdAt: creative.createdAt }; });
   return [...mediaSlides, ...creativeSlides].sort((left, right) => right.createdAt.localeCompare(left.createdAt));

@@ -74,6 +74,8 @@ The local compose setup creates:
 - `ooh_market` for the app
 - `ooh_market_test` for integration tests
 
+The compose file publishes PostgreSQL on `127.0.0.1:5432` only. Other machines on the network cannot connect to the database. The development password is in `docker-compose.yml`, so do not change the binding to `5432:5432`. If a different machine must connect, use an SSH tunnel.
+
 ### Application origin and port
 
 The `npm run dev` and `npm run start` commands are pinned to port **3001** in `package.json`. The port is fixed on purpose. Another EasyAD prototype runs on port 3000 on at least one machine, and an unpinned port let the two be confused for each other, which cost real debugging time.

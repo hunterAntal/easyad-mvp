@@ -4,7 +4,6 @@ import "./chatbot.css";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../types";
-import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
 
 const devicePagePrefixes = ["/devices", "/inventory", "/player"] as const;
@@ -28,15 +27,20 @@ function ChatbotWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: greeting }]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Keep the newest message in view.
   useEffect(() => {
-    if (open) {
-      listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-      inputRef.current?.focus();
-    }
-  }, [messages, open]);
+    if (open) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  }, [messages, error, sending, open]);
+
+  // Focus only when the panel opens. Focusing on every message reopened the
+  // on-screen keyboard on phones each time the assistant answered.
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     setMessages((current) => current.length === 1 && current[0]?.role === "assistant" ? [{ role: "assistant", content: greeting }] : current);
@@ -49,6 +53,7 @@ function ChatbotWidget() {
     const nextMessages = [...messages, { role: "user", content: text } as ChatMessage];
     setMessages(nextMessages);
     setInput("");
+    setError(null);
     setSending(true);
     try {
       const response = await fetch("/api/chat", {
@@ -56,11 +61,13 @@ function ChatbotWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: nextMessages, locale }),
       });
-      if (!response.ok) throw new Error("The assistant is unavailable right now.");
+      if (!response.ok) throw new Error("unavailable");
       const payload = await response.json() as { message: ChatMessage };
       setMessages((current) => [...current, payload.message]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The assistant is unavailable right now.");
+    } catch {
+      // The failure is shown inside the panel. As a toast it opened in the same
+      // corner as the panel and, with the panel open, nobody could see it.
+      setError("The assistant is unavailable right now.");
     } finally {
       setSending(false);
     }
@@ -98,6 +105,9 @@ function ChatbotWidget() {
             {sending ? (
               <div className="chatbot-msg assistant pending"><span className="async-spinner" /></div>
             ) : null}
+            {error && !sending ? (
+              <div className="chatbot-msg assistant error" role="alert">{t(error)}</div>
+            ) : null}
           </div>
           <form className="chatbot-input" noValidate onSubmit={send}>
             <input
@@ -106,7 +116,9 @@ function ChatbotWidget() {
               onChange={(event) => setInput(event.target.value)}
               placeholder={t("Type a message...")}
               aria-label={t("Message the assistant")}
-              disabled={sending}
+              // Not disabled while sending: a disabled input drops focus, which
+              // closed the phone keyboard. send() already ignores a second send.
+              aria-busy={sending}
               maxLength={4000}
             />
             <button type="submit" className="primary-button" disabled={sending || !input.trim()} aria-label={t("Send message")}>

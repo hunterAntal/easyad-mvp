@@ -579,7 +579,13 @@
   padding: 0 24px 28px;
 }
 
+/* backdrop-filter makes the top bar a stacking context. Without its own
+   z-index, the language menu's z-index counted only inside the bar, and any
+   positioned element later on the page painted over the open menu. 30 is below
+   the phone top bar (40) and the assistant (450). */
 .topbar {
+  z-index: 30;
+  position: relative;
   border-bottom: 1px solid var(--workspace-line);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -617,8 +623,12 @@
   line-height: 1.15;
 }
 
+/* One column per tile, however many tiles there are. repeat(3) left an empty
+   third column beside the advertiser's two tiles at every width. */
 .topbar .metrics {
-  grid-template-columns: repeat(3,minmax(118px,1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(118px,1fr);
   gap: 8px;
   width: min(540px,56%);
 }
@@ -691,8 +701,15 @@
 
 @media (max-width:900px) {
 
+/* The shell is min-height:100vh. As one column it has two auto rows, the top
+   bar and the workspace, and a short page shared the spare height between
+   them. At 615px wide on Find screens with no screens listed, the top bar grew
+   from about 100px to 337px and every nav item stretched to 143px, so the
+   selected item became a tall green block. The workspace takes the spare
+   height; the top bar keeps its own. */
 .shell {
   grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
   width: 100%;
   overflow-x: clip;
 }
@@ -799,7 +816,9 @@
 }
 
 .topbar .metrics {
-  grid-template-columns: repeat(3,minmax(0,1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0,1fr);
   width: 100%;
   overflow: visible;
 }
@@ -936,7 +955,9 @@
 @media (max-width:600px) {
   .government-brand { grid-template-columns: 34px minmax(0,1fr); gap: 8px; }
   .government-brand-mark { width: 34px; height: 34px; }
-  .government-brand span,
+  /* As specific as the rule that shows the subtitle, so this one wins. A bare
+     ".government-brand span" lost, and the sticky phone bar grew to 163px. */
+  .government-brand > div > span,
   .government-scope-card small { display: none; }
   .government-brand strong { font-size: .72rem; }
   .government-scope-card { grid-template-columns: 28px minmax(0,1fr); min-height: 44px; padding: 6px; }
@@ -1069,7 +1090,11 @@
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
+/* Above the top bar (30). The rail's workspace menu opens beside the rail, over
+   the workspace; inside a z-index 20 sidebar the taller stacked top bar at
+   1121px and below painted over the menu's options. */
 .sidebar.is-rail {
+  z-index: 35;
   align-items: center;
   padding: 60px 10px 14px;
 }
@@ -1092,6 +1117,9 @@
 /* .brand-mark is itself a div inside .brand, so a bare ".brand div" clipped the
    "EA" badge to 1x1 and left a hole at the top of the rail. */
 .sidebar.is-rail .brand > div:not(.brand-mark),
+/* The government brand is not a .brand, so its "EasyAD Platform / Civic Screen
+   Operations" text showed through the rail and ran into the page title. */
+.sidebar.is-rail .government-brand > div:not(.government-brand-mark),
 .sidebar.is-rail .tenant-identity,
 .sidebar.is-rail .workspace-switcher-copy,
 .sidebar.is-rail .workspace-switcher-chevron,
@@ -1189,6 +1217,16 @@
   padding: 0;
 }
 
+/* The menu spans its switcher (left/right -1px). In the rail that made it 46px
+   wide, and the "Advertiser ✓" option stuck out over the page edge. It opens
+   beside the rail instead. */
+.sidebar.is-rail .workspace-menu {
+  top: 0;
+  left: calc(100% + 8px);
+  right: auto;
+  min-width: 180px;
+}
+
 .sidebar.is-rail .brand-mark {
   border-radius: 10px;
   flex: none;
@@ -1281,7 +1319,7 @@
    aria-current="step", and a step that cannot be reached yet says why instead
    of leading to an empty screen. */
 .buying-steps {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   margin: 10px 0 0;
@@ -1293,6 +1331,72 @@
 .buying-step {
   align-items: center;
   display: flex;
+}
+
+/* The steps never wrap. A wrapped row left "Make an ad" alone on a second line
+   with its connector dash in front of it. The title column used to shrink to
+   whatever the tools left over, which squeezed the steps between 1121px and
+   about 1410px with the full sidebar.
+
+   Topbar renders a different structure when the steps show: the title and the
+   stats share .topbar-main, and the language menu sits beside it. The title
+   keeps the width the steps need, the stats drop below the steps when both
+   cannot fit, and the language menu stays top-right. This is intrinsic rather
+   than a breakpoint, so it holds for the collapsed rail, the full sidebar, and
+   longer French labels alike. It also stays a row below 1121px, where other
+   topbars stack into a column. */
+.topbar.has-buying-steps {
+  flex-flow: row wrap;
+  align-items: flex-start;
+}
+
+/* Basis 0 with the automatic minimum width: the language menu stays on the
+   first row until the title itself cannot fit beside it, on a phone. */
+.topbar-main {
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px 18px;
+  display: flex;
+}
+
+.topbar-main .topbar-title {
+  flex-shrink: 0;
+}
+
+.topbar-main .metrics {
+  flex: 0 1 540px;
+}
+
+.topbar.has-buying-steps .topbar-tools {
+  flex: none;
+  width: auto;
+  margin-left: auto;
+}
+
+/* On a phone the stats never share a row with the title, and inside
+   .topbar-main they were squeezed beside the language menu into about 250px.
+   Release the wrapper so the title and the language menu share the first row
+   and the stats take the whole second row. */
+@media (max-width: 560px) {
+  .topbar.has-buying-steps .topbar-main {
+    display: contents;
+  }
+
+  .topbar.has-buying-steps .topbar-title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .topbar.has-buying-steps .topbar-tools {
+    order: 1;
+  }
+
+  .topbar.has-buying-steps .metrics {
+    flex: 1 1 100%;
+    order: 2;
+  }
 }
 
 .buying-step + .buying-step::before {
@@ -1390,5 +1494,42 @@
   .buying-step > a,
   .buying-step > span {
     padding: 5px;
+  }
+}
+
+/* ---- Small shell fixes (UI audit) ------------------------------------------ */
+
+/* The assistant launcher is fixed at the bottom right. Without room below the
+   last content it covered the end of every page: a form field, a button, the
+   map's zoom controls. */
+.workspace {
+  padding-bottom: 96px;
+}
+
+/* A top bar that holds only the language menu (Network control) kept the
+   tools' 680px width, so "Screen network command centre" wrapped with space
+   to spare. */
+.topbar-tools:not(:has(.metrics)) {
+  width: auto;
+}
+
+/* The sidebar's focus ring (#1f7a5a42 on #111b22) was almost invisible, and the
+   active item's box-shadow replaced it. An outline does not compete with it. */
+.sidebar a:focus-visible,
+.sidebar button:focus-visible {
+  outline: 2px solid #7fd3b1;
+  outline-offset: 2px;
+}
+
+/* In a short window the column nav scrolls with no sign that it does:
+   "Performance" and "Billing" were simply gone at 600px tall. Shadows appear at
+   an edge only while there is more to scroll past it. */
+@media (min-width: 901px) {
+  .sidebar .nav {
+    background:
+      linear-gradient(var(--workspace-nav, #111b22) 30%, #0000) center top / 100% 28px no-repeat local,
+      linear-gradient(#0000, var(--workspace-nav, #111b22) 70%) center bottom / 100% 28px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, #0000008c, #0000) center top / 100% 12px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, #0000008c, #0000) center bottom / 100% 12px no-repeat scroll;
   }
 }

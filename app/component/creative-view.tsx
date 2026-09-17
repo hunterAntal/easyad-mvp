@@ -4,10 +4,11 @@ import "./creative-view.css";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";
-import { capitalize, creativeHref, isCreativeSubmissionAllowed, templateHeadline, templateTitle, validateCreative } from "../utils";
+import { capitalize, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, templateHeadline, templateTitle, validateCreative } from "../utils";
 import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
+import LocalDateTime from "./local-date-time";
 
 export default function CreativeView({
   draft,
@@ -79,7 +80,14 @@ export default function CreativeView({
           <>
             <div className="template-tabs">
               {(["retail", "finance", "event"] as CreativeDraft["template"][]).map((template) => (
-                <a key={template} href={creativeHref(draft, { template }, selectedBooking.id)} className={draft.template === template ? "active" : ""} onClick={() => setDraft((current) => ({ ...current, template }))}>{t(capitalize(template))}</a>
+                <a key={template} href={creativeHref(draft, { template }, selectedBooking.id)} className={draft.template === template ? "active" : ""} onClick={(event) => {
+                  if (!isPlainLeftClick(event)) return;
+                  // Switch in place and keep the address on this template; the
+                  // href alone reloaded the whole page after the switch.
+                  event.preventDefault();
+                  window.history.replaceState(window.history.state, "", event.currentTarget.href);
+                  setDraft((current) => ({ ...current, template }));
+                }}>{t(capitalize(template))}</a>
               ))}
             </div>
             <div className={`creative-canvas ${draft.template}`} style={{ aspectRatio: spec.ratio }}>
@@ -144,7 +152,7 @@ export default function CreativeView({
           {submittedCreative ? (
             <div className="decision-banner good">
               <strong>{t("Creative on file - {status}", { status: t(submittedCreative.status) })}</strong>
-              <span>{t("{summary}, submitted {date}.", { summary: creativeSummary(submittedCreative), date: formatDate(submittedCreative.createdAt, { dateStyle: "medium", timeStyle: "short" }) })}</span>
+              <span><LocalDateTime value={submittedCreative.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} template="{summary}, submitted {date}." variables={{ summary: creativeSummary(submittedCreative) }} /></span>
               {submittedCreative.publicUrl ? <a href={submittedCreative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a> : null}
             </div>
           ) : null}

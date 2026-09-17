@@ -5,7 +5,8 @@ import { InventoryAdvertiserResource, MediaResource, formats } from "../data";
 import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../lib/db";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import { money } from "../utils";
-import DeviceScreen from "./device-screen";
+import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
+import LocalDateTime from "./local-date-time";
 import DeviceApiGuide from "./device-api-guide";
 import type { DeviceMediaSlide } from "./device-media-carousel";
 import { deriveScreenCity, deviceTemplates, resolveDeviceTemplate } from "./device-templates";
@@ -81,9 +82,9 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
           <div><span className="eyebrow">{t("Live device display")}</span><h2>{t("{template} template preview", { template: t(templateLabel) })}</h2></div>
           <Link href={`/devices/${inventory.id}`}>{t("Open full device view")}</Link>
         </div>
-        <div className="public-device-preview">
+        <ScaledDevicePreview className="public-device-preview">
           <DeviceScreen inventoryName={inventory.name} city={city} imageInterval={inventory.imageInterval} slides={previewSlides} template={template} displayLanguage={inventory.displayLanguage ?? "en"} activeAlert={activeAlert} preview />
-        </div>
+        </ScaledDevicePreview>
       </section>
 
       <section className="public-device-section">
@@ -123,7 +124,7 @@ function DeviceResourceCard({ resource, locale, formatDate }: { resource: MediaR
         <span className="eyebrow">{t("Device resource")}</span>
         <h3>{resource.title}</h3>
         <p>{resource.originalName}</p>
-        <small>{t(resource.mediaType)} - {t("uploaded {date}", { date: formatDate(resource.createdAt, { dateStyle: "medium", timeStyle: "short" }) })}</small>
+        <small>{t(resource.mediaType)} - <LocalDateTime value={resource.createdAt} options={{ dateStyle: "medium", timeStyle: "short" }} template="uploaded {date}" /></small>
         <a href={resource.publicUrl} target="_blank" rel="noreferrer">{t("Open media file")}</a>
       </div>
     </article>

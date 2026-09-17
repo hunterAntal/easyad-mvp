@@ -24,7 +24,7 @@
   color: #ffffffb8;
   max-width: 680px;
   margin: 0;
-  font-size: clamp(1rem,2vw,1.3rem);
+  font-size: clamp(1rem,2cqw,1.3rem);
 }
 
 .device-carousel {
@@ -65,8 +65,8 @@
   border: 1px solid #ffffff4d;
   border-radius: 50%;
   place-items: center;
-  width: clamp(46px,5vw,64px);
-  height: clamp(46px,5vw,64px);
+  width: clamp(46px,5cqw,64px);
+  height: clamp(46px,5cqw,64px);
   padding: 0;
   transition: opacity .16s,background .16s,border-color .16s,transform .16s;
   display: grid;
@@ -76,11 +76,11 @@
 }
 
 .device-nav.prev {
-  left: clamp(14px,3vw,40px);
+  left: clamp(14px,3cqw,40px);
 }
 
 .device-nav.next {
-  right: clamp(14px,3vw,40px);
+  right: clamp(14px,3cqw,40px);
 }
 
 .device-nav:hover {

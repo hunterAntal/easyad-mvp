@@ -116,7 +116,9 @@
 .government-auth-help a:hover { text-decoration: underline; }
 
 @media (max-width: 980px) {
-  .government-auth-page { grid-template-columns: 1fr; }
+  /* One column inside min-height:100vh: the rows shared the spare height, and
+     the context panel's space-between spread its content apart on a tablet. */
+  .government-auth-page { grid-template-columns: 1fr; align-content: start; }
   .government-auth-context { gap: 32px; min-height: auto; padding: 30px; }
   .government-auth-intro h1 { max-width: 18ch; font-size: clamp(2.4rem,8vw,4.4rem); }
   .government-auth-boundary { margin: 0; }

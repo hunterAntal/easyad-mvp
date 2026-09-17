@@ -6,7 +6,7 @@ import { Booking, FormatKey, InventoryItem, Role, View, formats } from "../data"
 import type { DbUser } from "../lib/db";
 import type { Filters } from "../types";
 import { roleLabel } from "../roles";
-import { money, number, portalHref } from "../utils";
+import { isPlainLeftClick, money, number, portalHref } from "../utils";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
 import { Brand, Metric, NavLinkButton, SectionHeading } from "./shared-ui";
 import { LanguageSelector, useI18n } from "../i18n/client";
@@ -154,8 +154,10 @@ export default function Portal({
                 className={`format-tile ${!canAccessRole("advertiser") ? "locked" : ""}`}
                 href={canAccessRole("advertiser") ? `/?role=advertiser&view=discover&format=${key}` : loginHref("advertiser", "discover", `format=${key}`)}
                 key={key}
-                onClick={() => {
-                  if (canAccessRole("advertiser")) selectFormat(key);
+                onClick={(event) => {
+                  if (!canAccessRole("advertiser") || !isPlainLeftClick(event)) return;
+                  event.preventDefault();
+                  selectFormat(key);
                 }}
               >
                 <span>{t(formats[key].label)}</span>

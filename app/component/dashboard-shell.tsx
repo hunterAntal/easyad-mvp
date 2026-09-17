@@ -30,7 +30,7 @@ import {
 import { Booking, InventoryItem, Role, View } from "../data";
 import { roleLabel, roleValues, roleWorkspaceView } from "../roles";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { money, portalHref } from "../utils";
+import { isPlainLeftClick, money, portalHref } from "../utils";
 import { Brand } from "./shared-ui";
 import type { DbUser } from "../lib/db";
 import { LanguageSelector, useI18n } from "../i18n/client";
@@ -158,7 +158,7 @@ function BuyingSteps({ view, hasBookings, onSelect }: { view: View; hasBookings:
               <a
                 aria-current={isCurrent ? "step" : undefined}
                 href={portalHref("advertiser", step.view)}
-                onClick={(event) => { event.preventDefault(); onSelect(step.view); }}
+                onClick={(event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); onSelect(step.view); }}
               >{body}</a>
             )}
           </li>
@@ -183,6 +183,14 @@ const governmentNav: NavItem[] = [
 type AppSurface = "marketplace" | "government";
 
 export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void }) {
+  // At 900px and below the nav is a strip that scrolls sideways and loaded at
+  // its start, so "Results" or "Invoices" could be the current page with no
+  // visible "you are here". Bring the current item into view. "nearest" does
+  // nothing when it is already visible, so the page itself does not jump.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current?.querySelector<HTMLElement>("a.active")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [view]);
   const { t } = useI18n();
   const roleOptions = currentUser?.role === "admin" ? [...roleValues] : currentUser ? [currentUser.role] : [...roleValues];
   const displayRole = roleLabel(role);
@@ -211,7 +219,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           <div><small>{t("Secure workspace")}</small><strong>{t(role === "admin" ? "Cross-institution oversight" : "Institution network")}</strong></div>
         </div>
       ) : <WorkspaceSwitcher role={role} options={roleOptions} onSelect={(next) => { setRole(next); setView(roleWorkspaceView[next]); }} />}
-      <nav className="nav" aria-label={isGovernment ? t("Civic Screen Operations navigation") : t("{role} navigation", { role: t(displayRole) })}>
+      <nav className="nav" ref={navRef} aria-label={isGovernment ? t("Civic Screen Operations navigation") : t("{role} navigation", { role: t(displayRole) })}>
         {groups.map((group) => {
           const items = navigation.filter((item) => item.group === group);
           if (!items.length) return null;
@@ -224,7 +232,10 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
                   key={navView}
                   href={isGovernment ? `/government?view=${navView}` : portalHref(role, navView)}
                   className={view === navView ? "active" : ""}
-                  onClick={isGovernment ? undefined : (event) => { event.preventDefault(); setView(navView); }}
+                  // The rail shows bare icons; the clipped label still names the
+                  // link for a screen reader, and this names it for the pointer.
+                  title={collapsed ? t(label) : undefined}
+                  onClick={isGovernment ? undefined : (event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); setView(navView); }}
                 >
                   <Icon aria-hidden="true" />
                   <span className="nav-label">{t(label)}</span>
@@ -239,8 +250,9 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
       <div className="tenant-card">
         <div className="tenant-avatar" aria-hidden="true">{userName.slice(0, 2).toUpperCase()}</div>
         <div className="tenant-identity">
-          <strong>{userName}</strong>
-          <small>{currentUser ? `${currentUser.email} - ${t(roleLabel(currentUser.role))}` : t("Sign in to save changes")}</small>
+          {/* Both lines truncate with an ellipsis at every sidebar width. */}
+          <strong title={userName}>{userName}</strong>
+          <small title={currentUser?.email}>{currentUser ? `${currentUser.email} - ${t(roleLabel(currentUser.role))}` : t("Sign in to save changes")}</small>
           <span className="tenant-role"><span />{currentUser ? t(displayRole) : t("Demo workspace")}</span>
         </div>
         {currentUser ? (
@@ -281,6 +293,22 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // A listbox is expected to move with the arrow keys and to hand focus back to
+  // its button on Escape. Neither worked: Escape closed the menu and left focus
+  // on an option that no longer existed.
+  function focusOption(step: 1 | -1 | "first" | "last") {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    if (!items.length) return;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = step === "first" ? 0
+      : step === "last" ? items.length - 1
+      : current < 0 ? (step > 0 ? 0 : items.length - 1)
+      : (current + step + items.length) % items.length;
+    items[next]?.focus();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -288,7 +316,9 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
     }
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     document.addEventListener("keydown", closeOnEscape);
@@ -300,13 +330,38 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
 
   return (
     <div className={`workspace-switcher${open ? " is-open" : ""}`} ref={rootRef}>
-      <button aria-expanded={open} aria-haspopup="listbox" aria-label={t("Workspace")} className="workspace-switcher-button" onClick={() => setOpen((current) => !current)} type="button">
+      <button
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={t("Workspace")}
+        className="workspace-switcher-button"
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          setOpen(true);
+          window.requestAnimationFrame(() => focusOption(event.key === "ArrowDown" ? "first" : "last"));
+        }}
+        ref={buttonRef}
+        type="button"
+      >
         <span className="workspace-switcher-icon"><LayoutDashboard aria-hidden="true" /></span>
         <span className="workspace-switcher-copy"><small>{t("Active workspace")}</small><strong>{t(roleLabel(role))}</strong></span>
         <ChevronDown className="workspace-switcher-chevron" aria-hidden="true" />
       </button>
       {open ? (
-        <div aria-label={t("Available workspaces")} className="workspace-menu" role="listbox">
+        <div
+          aria-label={t("Available workspaces")}
+          className="workspace-menu"
+          onKeyDown={(event) => {
+            const steps: Record<string, 1 | -1 | "first" | "last"> = { ArrowDown: 1, ArrowUp: -1, Home: "first", End: "last" };
+            if (!(event.key in steps)) return;
+            event.preventDefault();
+            focusOption(steps[event.key]);
+          }}
+          ref={menuRef}
+          role="listbox"
+        >
           {options.map((option) => (
             <button
               aria-label={t(roleLabel(option))}
@@ -334,24 +389,47 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, setView,
   const isGovernment = surface === "government";
   const isAdvertiser = role === "advertiser" && !isGovernment;
   const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
+  const showSteps = isAdvertiser && buyingSteps.some((step) => step.view === view);
+  const titleBlock = (
+    <div className="topbar-title">
+      <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
+      <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
+      {showSteps && setView ? <BuyingSteps view={view} hasBookings={bookings.length > 0} onSelect={setView} /> : null}
+    </div>
+  );
+  const metrics = view !== "network" ? (
+    <div className="metrics" aria-label={t("Workspace summary")}>
+      <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
+      {/* Occupancy is a yield metric for the person selling the screen. It
+          means nothing to the person buying one, so the buyer does not see it. */}
+      {isAdvertiser ? null : <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>}
+      <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t(isAdvertiser ? "Your spend so far" : "Booked value")}</small></div>
+    </div>
+  ) : null;
+
+  // With the buying steps, the title and the stats share one wrapping row, so
+  // the stats drop below the steps when space runs out. The language menu sits
+  // outside that row and stays top-right beside the title.
+  if (showSteps && setView) {
+    return (
+      <header className="topbar has-buying-steps">
+        <div className="topbar-main">
+          {titleBlock}
+          {metrics}
+        </div>
+        <div className="topbar-tools">
+          <LanguageSelector placement="embedded" />
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className={`topbar${isGovernment ? " government-topbar" : ""}`}>
-      <div className="topbar-title">
-        <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
-        <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
-        {isAdvertiser && buyingSteps.some((step) => step.view === view) && setView
-          ? <BuyingSteps view={view} hasBookings={bookings.length > 0} onSelect={setView} />
-          : null}
-      </div>
+      {titleBlock}
       {isGovernment && view === "network" ? <div className="government-session-status"><span /><div><strong>{t("Institution systems")}</strong><small>{t("Authenticated operating session")}</small></div></div> : null}
       <div className="topbar-tools">
-        {view !== "network" ? <div className="metrics" aria-label={t("Workspace summary")}>
-          <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
-          {/* Occupancy is a yield metric for the person selling the screen. It
-              means nothing to the person buying one, so the buyer does not see it. */}
-          {isAdvertiser ? null : <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>}
-          <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t(isAdvertiser ? "Your spend so far" : "Booked value")}</small></div>
-        </div> : null}
+        {metrics}
         <LanguageSelector placement="embedded" />
       </div>
     </header>

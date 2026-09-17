@@ -43,6 +43,12 @@
   font-size: .78rem;
 }
 
+/* #bcc8c4 is the dark sidebar's label colour. On the white workspace panels it
+   gave about 1.7:1, so "Device location" and "Device tags" were nearly invisible. */
+.workspace .field-label {
+  color: var(--muted);
+}
+
 .select {
   border: 1px solid var(--line);
   width: 100%;
@@ -601,10 +607,18 @@ button.table-row:hover {
   position: relative;
 }
 
+/* A column, so the list below the heading takes only the height that is left.
+   With a fixed list height the heading pushed the list's end past this clip. */
 .list-panel {
+  flex-direction: column;
   max-height: 640px;
   padding: 0;
+  display: flex;
   overflow: hidden;
+}
+
+.list-panel > .panel-heading {
+  flex: none;
 }
 
 .list-panel .panel-heading {

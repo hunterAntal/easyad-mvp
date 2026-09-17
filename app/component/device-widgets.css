@@ -11,7 +11,7 @@
 }
 
 .device-player-preview .device-clock strong {
-  font-size: clamp(1.1rem,2vw,1.8rem);
+  font-size: clamp(1.1rem,2cqw,1.8rem);
 }
 
 .device-player-preview .device-clock span,
@@ -24,7 +24,7 @@
 
 .device-player-preview .weather-now strong,
 .device-player-preview .weather-compact strong {
-  font-size: clamp(1.1rem,2.4vw,1.9rem);
+  font-size: clamp(1.1rem,2.4cqw,1.9rem);
 }
 
 .device-widget-eyebrow {
@@ -47,7 +47,7 @@
 
 .device-clock strong {
   letter-spacing: -.01em;
-  font-size: clamp(1.8rem,3.4vw,2.8rem);
+  font-size: clamp(1.8rem,3.4cqw,2.8rem);
   line-height: 1;
 }
 
@@ -77,7 +77,7 @@
 }
 
 .weather-now strong {
-  font-size: clamp(2rem,4vw,3rem);
+  font-size: clamp(2rem,4cqw,3rem);
   line-height: 1;
   display: block;
 }
@@ -130,7 +130,7 @@
 }
 
 .weather-compact strong {
-  font-size: clamp(1.4rem,2.6vw,2rem);
+  font-size: clamp(1.4rem,2.6cqw,2rem);
 }
 
 .weather-compact span {
@@ -240,7 +240,7 @@
 .transit-ticker {
   align-items: center;
   gap: 14px;
-  padding: 10px clamp(16px,2vw,30px);
+  padding: 10px clamp(16px,2cqw,30px);
   display: flex;
 }
 
