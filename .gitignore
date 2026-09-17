@@ -45,3 +45,6 @@ Desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Local Claude Code scheduling state, not project configuration
+.claude/scheduled_tasks.lock

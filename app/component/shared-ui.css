@@ -677,3 +677,23 @@ button.table-row:hover {
 }
 }
 }
+
+/* An empty state that carries a next action gets a little more room and a
+   solid edge, so it reads as somewhere to act rather than a dead notice. */
+.empty-state.has-action {
+  border-color: var(--line-strong);
+  gap: 6px;
+  padding: 18px 18px 16px;
+}
+
+.empty-state.has-action strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.empty-state-action {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  display: flex;
+}

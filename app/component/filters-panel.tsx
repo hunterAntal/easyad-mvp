@@ -1,11 +1,13 @@
 "use client";
 
 import "./filters-panel.css";
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { Filters } from "../types";
 import { FormatKey, InventoryItem, formats } from "../data";
 import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID } from "../utils";
 import { useI18n } from "../i18n/client";
+import { FILTERS_COOKIE_MAX_AGE, FILTERS_COOKIE_NAME, readBrowserPreference, writeBrowserPreference } from "../lib/preferences";
+import { defaultFilters } from "../utils";
 
 type LocationOption = {
   id: string;
@@ -33,6 +35,37 @@ export default function FiltersPanel({
 }: FiltersPanelProps) {
   const { formatNumber, locale, t } = useI18n();
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  // Starts closed on both the server and the first client render so the markup
+  // matches, then adopts the remembered preference.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Disclosure hides detail, never capability. A filter that is narrowing the
+  // results while out of sight would be invisible capability, so the count is
+  // always on the button and an active filter opens the group on arrival.
+  const activeAdvanced =
+    (filters.format !== defaultFilters.format ? 1 : 0) +
+    (filters.audience !== defaultFilters.audience ? 1 : 0) +
+    (filters.competitor !== defaultFilters.competitor ? 1 : 0) +
+    (filters.minImpressions !== defaultFilters.minImpressions ? 1 : 0) +
+    (filters.minTraffic !== defaultFilters.minTraffic ? 1 : 0) +
+    (filters.minIncome !== defaultFilters.minIncome ? 1 : 0) +
+    (filters.selectedTags.length ? 1 : 0) +
+    (filters.showCompetitors !== defaultFilters.showCompetitors ? 1 : 0);
+
+  useEffect(() => {
+    if (readBrowserPreference(FILTERS_COOKIE_NAME) === "1") setAdvancedOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeAdvanced > 0) setAdvancedOpen(true);
+  }, [activeAdvanced]);
+
+  function toggleAdvanced() {
+    setAdvancedOpen((open) => {
+      writeBrowserPreference(FILTERS_COOKIE_NAME, open ? "0" : "1", FILTERS_COOKIE_MAX_AGE);
+      return !open;
+    });
+  }
   const audiences = ["all", ...Array.from(new Set(inventory.map((item) => item.audience)))];
   const allTags = useMemo(
     () => Array.from(new Set(inventory.flatMap((item) => item.tags ?? []))).sort((a, b) => a.localeCompare(b)),
@@ -68,6 +101,13 @@ export default function FiltersPanel({
         </select>
       </label>
       <Range name="radius" label={t("Radius: {count} km", { count: filters.radius })} min={8} max={30} value={filters.radius} onChange={(radius) => setFilters((current) => ({ ...current, radius }))} />
+      <Range name="priceMax" label={t("Max daily rate: {amount}", { amount: formatCurrency(filters.priceMax, locale) })} min={300} max={1000} step={20} value={filters.priceMax} onChange={(priceMax) => setFilters((current) => ({ ...current, priceMax }))} />
+      <button aria-controls="discover-advanced-filters" aria-expanded={advancedOpen} className="filter-disclosure" onClick={toggleAdvanced} type="button">
+        <span>{t("More filters")}</span>
+        {activeAdvanced ? <span className="filter-disclosure-count">{activeAdvanced}</span> : null}
+        <span aria-hidden="true" className="filter-disclosure-chevron">{advancedOpen ? "\u2212" : "+"}</span>
+      </button>
+      <div className="filter-advanced" hidden={!advancedOpen} id="discover-advanced-filters">
       <label>
         {t("Format")}
         <select className="select" name="format" value={filters.format} onChange={(event) => setFilters((current) => ({ ...current, format: event.target.value as Filters["format"] }))}>
@@ -90,7 +130,6 @@ export default function FiltersPanel({
       <Range name="minImpressions" label={t("Min impressions: {count}", { count: formatNumber(filters.minImpressions) })} min={0} max={180000} step={10000} value={filters.minImpressions} onChange={(minImpressions) => setFilters((current) => ({ ...current, minImpressions }))} />
       <Range name="minTraffic" label={t("Min traffic: {count}", { count: formatNumber(filters.minTraffic) })} min={0} max={130000} step={5000} value={filters.minTraffic} onChange={(minTraffic) => setFilters((current) => ({ ...current, minTraffic }))} />
       <Range name="minIncome" label={t("Min income: {amount}", { amount: formatCurrency(filters.minIncome, locale) })} min={0} max={140000} step={5000} value={filters.minIncome} onChange={(minIncome) => setFilters((current) => ({ ...current, minIncome }))} />
-      <Range name="priceMax" label={t("Max daily rate: {amount}", { amount: formatCurrency(filters.priceMax, locale) })} min={300} max={1000} step={20} value={filters.priceMax} onChange={(priceMax) => setFilters((current) => ({ ...current, priceMax }))} />
       <div className="tag-filter-field">
         <div className="tag-filter-heading">
           <span className="field-label">{t("Device tags")}</span>
@@ -130,6 +169,7 @@ export default function FiltersPanel({
         <input type="checkbox" name="showCompetitors" value="true" checked={filters.showCompetitors} onChange={(event) => setFilters((current) => ({ ...current, showCompetitors: event.target.checked }))} />
         {t("Show nearby businesses")}
       </label>
+      </div>
     </form>
   );
 }

@@ -15,6 +15,7 @@ import InstitutionTeamView from "./component/institution-team-view";
 import FleetOperations from "./component/fleet-operations";
 import InstitutionNetworkView, { type EmergencyOverrideDraft } from "./component/institution-network-view";
 import Portal from "./component/portal";
+import { EmptyState } from "./component/shared-ui";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
 import type { BookingDraft, CreativeDraft, Filters, MapPoint } from "./types";
 import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
@@ -590,9 +591,9 @@ export default function OohApp({
         if (currentUser?.role === "admin") return <AccountManagementView users={managedUsers} bookings={bookings} inventory={inventory} creatives={creatives} mediaResources={mediaResources} onCreateAccount={createManagedUser} onUpdateAccount={updateManagedUser} onDeleteAccount={deleteManagedUser} />;
         return null;
       case "reports":
-        return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} />;
+        return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} isAdvertiser={role === "advertiser"} />;
       case "billing":
-        return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} paymentsEnabled={featureFlags.payments} />;
+        return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} isAdvertiser={role === "advertiser"} paymentsEnabled={featureFlags.payments} />;
       default:
         return null;
     }
@@ -616,7 +617,7 @@ export default function OohApp({
     <div className={`shell${surface === "government" ? " government-shell" : ""}`}>
       <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} surface={surface} />
+        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
@@ -692,10 +693,13 @@ function EmptyInventoryPanel({ canManage }: { canManage: boolean }) {
   const { t } = useI18n();
   return (
     <section className="panel">
-      <div className="empty-state">
-        <strong>{t("No inventory records found")}</strong>
-        <span>{t(canManage ? "Add a device in Inventory to start selling media." : "An operator or super admin needs to add inventory before campaigns can be launched.")}</span>
-      </div>
+      <EmptyState
+        title={canManage ? "No screens yet" : "No screens are available yet"}
+        copy={canManage
+          ? "Add a device in Inventory to start selling media."
+          : "Nobody has listed a screen for advertising yet. Check back soon, or ask the screen owner to list it."}
+        action={canManage ? <a className="primary-button" href="/?view=inventory">{t("Open Inventory")}</a> : undefined}
+      />
     </section>
   );
 }

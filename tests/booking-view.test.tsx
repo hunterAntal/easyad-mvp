@@ -55,76 +55,76 @@ function renderBooking(item: InventoryItem) {
 test("physical billboards omit digital loop-time metrics", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: "static" });
 
-  expect(screen.queryByText("Reserved loop time")).not.toBeInTheDocument();
-  expect(screen.queryByText("Available loop time")).not.toBeInTheDocument();
-  expect(screen.queryByText("Booked loop time")).not.toBeInTheDocument();
-  expect(screen.getByText("Estimated spend")).toBeInTheDocument();
-  expect(screen.getByText("Run length")).toBeInTheDocument();
-  expect(screen.getByText("Estimated impressions")).toBeInTheDocument();
+  expect(screen.queryByText("Your time each cycle")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time still free")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time already booked")).not.toBeInTheDocument();
+  expect(screen.getByText("Total cost")).toBeInTheDocument();
+  expect(screen.getByText("How long it runs")).toBeInTheDocument();
+  expect(screen.getByText("Estimated views")).toBeInTheDocument();
   expect(screen.getByText("Available")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText("Creative image for approval"), {
+  fireEvent.change(screen.getByLabelText("Your ad picture"), {
     target: { files: [new File(["image"], "billboard.png", { type: "image/png" })] },
   });
 
   expect(screen.getByText("billboard.png")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeEnabled();
 });
 
 test("physical billboard requests outside the owner-defined dates are unavailable", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: "static", availableFrom: "2026-08-01", availableTo: "2026-08-31" });
 
   expect(screen.getByText("Unavailable")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeDisabled();
-  expect(screen.queryByText("Capacity full")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
+  expect(screen.queryByText("Fully booked")).not.toBeInTheDocument();
 });
 
 test("booking rejects non-image creative files before submission", () => {
   renderBooking(baseItem);
 
-  fireEvent.change(screen.getByLabelText("Creative image for approval"), {
+  fireEvent.change(screen.getByLabelText("Your ad picture"), {
     target: { files: [new File(["not an image"], "creative.pdf", { type: "application/pdf" })] },
   });
 
   expect(screen.getByRole("alert")).toHaveTextContent("Choose a PNG, JPEG, or GIF image.");
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
 });
 
 test("digital bookings accept animated GIF creative", () => {
   renderBooking(baseItem);
 
-  fireEvent.change(screen.getByLabelText("Creative image for approval"), {
+  fireEvent.change(screen.getByLabelText("Your ad picture"), {
     target: { files: [new File(["GIF89a"], "animated.gif", { type: "image/gif" })] },
   });
 
   expect(screen.getByText("animated.gif")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeEnabled();
 });
 
 test("physical billboard bookings do not accept animated GIF creative", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: "static" });
 
-  fireEvent.change(screen.getByLabelText("Creative image for approval"), {
+  fireEvent.change(screen.getByLabelText("Your ad picture"), {
     target: { files: [new File(["GIF89a"], "animated.gif", { type: "image/gif" })] },
   });
 
   expect(screen.getByRole("alert")).toHaveTextContent("Choose a PNG or JPEG image.");
-  expect(screen.getByRole("button", { name: "Submit booking for approval" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
 });
 
 test("digital screens retain loop-time metrics", () => {
   renderBooking(baseItem);
 
-  expect(screen.getByText("Reserved loop time")).toBeInTheDocument();
-  expect(screen.getByText("Available loop time")).toBeInTheDocument();
-  expect(screen.getByText("Booked loop time")).toBeInTheDocument();
+  expect(screen.getByText("Your time each cycle")).toBeInTheDocument();
+  expect(screen.getByText("Time still free")).toBeInTheDocument();
+  expect(screen.getByText("Time already booked")).toBeInTheDocument();
 });
 
 test("legacy static-format inventory also omits loop-time metrics", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: undefined });
 
-  expect(screen.queryByText("Reserved loop time")).not.toBeInTheDocument();
-  expect(screen.queryByText("Available loop time")).not.toBeInTheDocument();
-  expect(screen.queryByText("Booked loop time")).not.toBeInTheDocument();
+  expect(screen.queryByText("Your time each cycle")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time still free")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time already booked")).not.toBeInTheDocument();
 });

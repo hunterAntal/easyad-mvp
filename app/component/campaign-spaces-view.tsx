@@ -4,7 +4,7 @@ import "./campaign-spaces-view.css";
 import type { Booking, InventoryItem } from "../data";
 import type { DbUser } from "../lib/db";
 import { money, reservedLoopSeconds } from "../utils";
-import { Meter, PanelHeading } from "./shared-ui";
+import { EmptyState, Meter, PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 
@@ -23,13 +23,17 @@ export default function CampaignSpacesView({
   const visibleBookings = bookings
     .filter((booking) => booking.status !== "rejected")
     .filter((booking) => !currentUser || currentUser.role === "admin" || booking.advertiser === currentUser.name);
+  // Admin sees this screen too, and "find screens near you" is not their job.
+  const isAdvertiser = currentUser?.role === "advertiser";
 
   return (
     <section className="grid booking-grid">
       <div className="panel span-2">
-        <PanelHeading eyebrow="Advertiser reserved spaces" title="Campaign inventory" />
+        <PanelHeading eyebrow={isAdvertiser ? "Your ads" : "Advertiser reserved spaces"} title={isAdvertiser ? "Screens you have booked" : "Campaign inventory"} />
         <div className="inventory-table campaign-space-table">
-          <div className="table-head"><span>{t("Campaign")}</span><span>{t("Device")}</span><span>{t("Dates")}</span><span>{t("Loop reserved")}</span><span>{t("Status")}</span><span>{t("Creative")}</span><span>{t("Actions")}</span></div>
+          {/* A column header above an empty table labels nothing. It appears
+              only once there is a row to label. */}
+          {visibleBookings.length ? <div className="table-head"><span>{t("Campaign")}</span><span>{t(isAdvertiser ? "Screen" : "Device")}</span><span>{t("Dates")}</span><span>{t(isAdvertiser ? "Your time each cycle" : "Loop reserved")}</span><span>{t("Status")}</span><span>{t(isAdvertiser ? "Your picture" : "Creative")}</span><span>{t("Actions")}</span></div> : null}
           {visibleBookings.length ? visibleBookings.map((booking) => {
             const item = inventory.find((unit) => unit.id === booking.inventoryId);
             const isDigital = item ? isDigitalInventory(item) : false;
@@ -51,13 +55,20 @@ export default function CampaignSpacesView({
               </div>
             );
           }) : (
-            <div className="empty-state">
-              <strong>{t("No campaign spaces yet")}</strong>
-              <span>{t("Submit a booking with its creative image to start the approval workflow.")}</span>
-            </div>
+            <EmptyState
+              title={isAdvertiser ? "You have no campaigns yet" : "No campaign spaces yet"}
+              copy={isAdvertiser
+                ? "A campaign appears here once you book a screen and send your ad picture for approval."
+                : "Submit a booking with its creative image to start the approval workflow."}
+              action={isAdvertiser ? <a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a> : undefined}
+            />
           )}
         </div>
       </div>
+      {/* Three cards of documentation about how loop capacity works. That is
+          operator mechanics, and for an advertiser it is noise that also leaves
+          a half-width orphan panel beside the list. */}
+      {isAdvertiser ? null : (
       <div className="panel">
         <PanelHeading eyebrow="Creative assignment" title="Reserved devices" />
         <div className="automation-list">
@@ -66,6 +77,7 @@ export default function CampaignSpacesView({
           <div><strong>{t("Operator controls")}</strong><span>{t("Loop interval and maximum loop capacity are managed from inventory.")}</span></div>
         </div>
       </div>
+      )}
     </section>
   );
 }

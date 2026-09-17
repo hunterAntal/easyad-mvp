@@ -206,7 +206,7 @@
 }
 
 .validation-list .fail {
-  border-left-color: var(--coral);
+  border-left-color: var(--state-danger);
   background: #fff8f6;
 }
 

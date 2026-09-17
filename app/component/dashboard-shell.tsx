@@ -42,15 +42,18 @@ type NavItem = {
 };
 
 const roleNav: Record<Role, NavItem[]> = {
+  // Advertiser labels name the task, not the industry term. "Creative studio"
+  // and "Content" both meant "your pictures" to a shop owner, which is why the
+  // two were indistinguishable.
   advertiser: [
-    { view: "portal", label: "Portal", icon: Globe2, group: "Workspace" },
-    { view: "discover", label: "Discover", icon: Search, group: "Workspace" },
-    { view: "booking", label: "Booking", icon: CalendarDays, group: "Operations" },
-    { view: "campaigns", label: "Campaigns", icon: Megaphone, group: "Operations" },
-    { view: "creative", label: "Creative studio", icon: Sparkles, group: "Operations" },
-    { view: "resources", label: "Content", icon: Images, group: "Operations" },
-    { view: "reports", label: "Performance", icon: BarChart3, group: "Insights" },
-    { view: "billing", label: "Billing", icon: CreditCard, group: "Insights" },
+    { view: "portal", label: "Home", icon: Globe2, group: "Workspace" },
+    { view: "discover", label: "Find screens", icon: Search, group: "Workspace" },
+    { view: "booking", label: "Book dates", icon: CalendarDays, group: "Operations" },
+    { view: "creative", label: "Make an ad", icon: Sparkles, group: "Operations" },
+    { view: "resources", label: "Your pictures", icon: Images, group: "Operations" },
+    { view: "campaigns", label: "Your campaigns", icon: Megaphone, group: "Operations" },
+    { view: "reports", label: "Results", icon: BarChart3, group: "Insights" },
+    { view: "billing", label: "Invoices", icon: CreditCard, group: "Insights" },
   ],
   operator: [
     { view: "portal", label: "Portal", icon: Globe2, group: "Workspace" },
@@ -102,6 +105,21 @@ const viewTitles: Record<View, { title: string; eyebrow: string }> = {
   billing: { title: "Payments and billing", eyebrow: "Finance" },
 };
 
+// Plain-language titles for the advertiser only. A shop owner buying a week of
+// screen time is not a trained media buyer, so the marketplace wording drops the
+// trade vocabulary. Operator, institution, and government wording is unchanged,
+// because those people are trained and rely on the precise operational terms.
+const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: string }>> = {
+  portal: { title: "Advertise your business", eyebrow: "Get started" },
+  discover: { title: "Find screens near you", eyebrow: "Step 1 of 4" },
+  booking: { title: "Book your dates", eyebrow: "Step 2 of 4" },
+  creative: { title: "Add your ad", eyebrow: "Step 3 of 4" },
+  campaigns: { title: "Your campaigns", eyebrow: "Track your ads" },
+  resources: { title: "Your pictures and videos", eyebrow: "Ad library" },
+  reports: { title: "How your ads performed", eyebrow: "Results" },
+  billing: { title: "Your invoices", eyebrow: "Payments" },
+};
+
 const groups: NavItem["group"][] = ["Workspace", "Operations", "Insights"];
 const governmentNav: NavItem[] = [
   { view: "network", label: "Command centre", icon: Map, group: "Workspace" },
@@ -139,7 +157,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           if (!items.length) return null;
           return (
             <div className="nav-group" key={group}>
-              <span className="nav-group-label">{t(isGovernment ? governmentGroupLabel(group) : group)}</span>
+              <span className="nav-group-label">{t(isGovernment ? governmentGroupLabel(group) : role === "advertiser" ? advertiserGroupLabel(group) : group)}</span>
               {items.map(({ view: navView, label, icon: Icon }) => (
                 <a
                   aria-current={view === navView ? "page" : undefined}
@@ -189,6 +207,14 @@ function governmentGroupLabel(group: NavItem["group"]) {
   if (group === "Workspace") return "Command centre";
   if (group === "Operations") return "Fleet operations";
   return "Oversight";
+}
+
+// "Workspace", "Operations" and "Insights" describe the software. The advertiser
+// headings describe what the person is trying to do.
+function advertiserGroupLabel(group: NavItem["group"]) {
+  if (group === "Workspace") return "Start here";
+  if (group === "Operations") return "Run your ad";
+  return "See how it did";
 }
 
 function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: Role[]; onSelect: (role: Role) => void }) {
@@ -241,12 +267,13 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
   );
 }
 
-export function Topbar({ view, visibleCount, inventory, bookings, surface = "marketplace" }: { view: View; visibleCount: number; inventory: InventoryItem[]; bookings: Booking[]; surface?: AppSurface }) {
+export function Topbar({ view, visibleCount, inventory, bookings, role, surface = "marketplace" }: { view: View; visibleCount: number; inventory: InventoryItem[]; bookings: Booking[]; role?: Role; surface?: AppSurface }) {
   const { locale, t } = useI18n();
   const averageOccupancy = inventory.length ? Math.round(inventory.reduce((sum, item) => sum + item.occupancy, 0) / inventory.length) : 0;
   const bookedValue = bookings.reduce((sum, booking) => sum + booking.spend, 0);
-  const title = viewTitles[view];
   const isGovernment = surface === "government";
+  const isAdvertiser = role === "advertiser" && !isGovernment;
+  const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
   return (
     <header className={`topbar${isGovernment ? " government-topbar" : ""}`}>
       <div className="topbar-title">
@@ -256,9 +283,11 @@ export function Topbar({ view, visibleCount, inventory, bookings, surface = "mar
       {isGovernment && view === "network" ? <div className="government-session-status"><span /><div><strong>{t("Institution systems")}</strong><small>{t("Authenticated operating session")}</small></div></div> : null}
       <div className="topbar-tools">
         {view !== "network" ? <div className="metrics" aria-label={t("Workspace summary")}>
-          <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t("Matching units")}</small></div>
-          <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>
-          <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t("Booked value")}</small></div>
+          <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
+          {/* Occupancy is a yield metric for the person selling the screen. It
+              means nothing to the person buying one, so the buyer does not see it. */}
+          {isAdvertiser ? null : <div><Gauge aria-hidden="true" /><span>{averageOccupancy}%</span><small>{t("Average occupancy")}</small></div>}
+          <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t(isAdvertiser ? "Your spend so far" : "Booked value")}</small></div>
         </div> : null}
         <LanguageSelector placement="embedded" />
       </div>

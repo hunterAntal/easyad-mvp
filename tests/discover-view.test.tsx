@@ -110,6 +110,11 @@ describe("discover view state", () => {
     const user = userEvent.setup();
     render(<DiscoverHarness />);
 
+    // Tags now sit behind the More filters disclosure (ADR 0008 stage 1), so
+    // they are out of the accessibility tree until it is opened.
+    expect(screen.queryByRole("button", { name: "Filter tag airport" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /More filters/ }));
+
     expect(screen.getByRole("button", { name: "Filter tag airport" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filter tag digital" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Filter tag urban" })).not.toBeInTheDocument();

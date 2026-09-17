@@ -41,6 +41,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   onOpenInventory: (inventoryId: string) => void;
 }) {
   const { formatDate, formatNumber, t } = useI18n();
+  const isAdvertiser = currentUser?.role === "advertiser";
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const [typeFilter, setTypeFilter] = useState<LibraryFilter>("all");
@@ -58,15 +59,15 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
 
   return <section className="content-cms">
     <div className="cms-summary" aria-label={t("Content status summary")}>
-      <SummaryMetric label="Total resources" value={items.length} icon={<Layers3 />} />
+      <SummaryMetric label={isAdvertiser ? "Pictures and videos" : "Total resources"} value={items.length} icon={<Layers3 />} />
       <SummaryMetric label="Active" value={countStatus(items, "active")} tone="good" icon={<ImageIcon />} />
       <SummaryMetric label="In review" value={countStatus(items, "review")} tone="warn" icon={<FileImage />} />
       <SummaryMetric label="Scheduled" value={countStatus(items, "scheduled")} icon={<Film />} />
     </div>
     <div className="panel cms-library-panel">
-      <PanelHeading eyebrow="Account resources" title="Content library" />
+      <PanelHeading eyebrow={isAdvertiser ? "Ad library" : "Account resources"} title={isAdvertiser ? "Your pictures and videos" : "Content library"} />
       <div className="cms-toolbar">
-        <label className="cms-search"><Search aria-hidden="true" /><input aria-label={t("Search resources")} placeholder={t("Search campaigns, devices, files...")} ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} />{query ? <button aria-label={t("Clear resource search")} onClick={() => { setQuery(""); searchRef.current?.focus(); }} type="button"><X aria-hidden="true" /></button> : null}</label>
+        <label className="cms-search"><Search aria-hidden="true" /><input aria-label={t("Search resources")} placeholder={t(isAdvertiser ? "Search your pictures and videos" : "Search campaigns, devices, files...")} ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} />{query ? <button aria-label={t("Clear resource search")} onClick={() => { setQuery(""); searchRef.current?.focus(); }} type="button"><X aria-hidden="true" /></button> : null}</label>
         <label>{t("Type")}<select aria-label={t("Filter by resource type")} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as LibraryFilter)}><option value="all">{t("All types")}</option><option value="image">{t("Images")}</option><option value="video">{t("Videos")}</option><option value="template">{t("Templates")}</option></select></label>
         <label>{t("Status")}<select aria-label={t("Filter by status")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}><option value="all">{t("All statuses")}</option><option value="active">{t("Active")}</option><option value="review">{t("In review")}</option><option value="scheduled">{t("Scheduled")}</option><option value="inactive">{t("Inactive")}</option></select></label>
       </div>
@@ -75,7 +76,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
           {filtered.length ? filtered.map((item) => <button className={`cms-resource-card${selected?.id === item.id ? " selected" : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button">
             <ResourcePreview item={item} />
             <span className="cms-resource-copy"><strong>{item.title}</strong><small>{item.inventoryName}</small><span className={`status cms-status ${item.status}`}>{t(item.statusLabel)}</span></span>
-          </button>) : <div className="empty-state cms-empty"><strong>{t("No matching resources")}</strong><span>{t("Adjust the search or filters to see more of your content.")}</span></div>}
+          </button>) : <div className="empty-state cms-empty"><strong>{t(isAdvertiser ? "Nothing here yet" : "No matching resources")}</strong><span>{t(isAdvertiser ? "Pictures you send with a booking appear here. Change the search or the filters to see more." : "Adjust the search or filters to see more of your content.")}</span></div>}
         </div>
         <aside className="cms-detail" aria-label={t("Selected resource details")}>
           {selected ? <>
