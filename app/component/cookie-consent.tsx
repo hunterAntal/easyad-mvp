@@ -35,17 +35,17 @@ export default function CookieConsentBanner() {
   return open ? <section className="cookie-consent" aria-labelledby="cookie-consent-title">
     <h2 id="cookie-consent-title" ref={headingRef} tabIndex={-1}>{t("Your cookie choices")}</h2>
     <p>{t("We use necessary cookies for sign-in, security, your selected language, and your cookie choices. With your permission, optional cookies remember whether to skip the welcome screen.")}</p>
-    <p>{t("Your choice is saved for 6 months. You can change it anytime in Cookie settings. Location permission is managed separately by your browser.")}</p>
+    <p className="cookie-consent-note">{t("Your choice is saved for 6 months. You can change it anytime in Cookie settings. Location permission is managed separately by your browser.")}</p>
     {customize && <div className="cookie-consent-options">
-      <p><strong>{t("Necessary cookies")}</strong> — {t("Always on")}</p>
-      <label><input type="checkbox" checked={preferences} onChange={event => setPreferences(event.target.checked)} /> {t("Remember welcome screen preference")}</label>
+      <div className="cookie-consent-option"><strong>{t("Necessary cookies")}</strong><span className="cookie-consent-badge">{t("Always on")}</span></div>
+      <label className="cookie-consent-option"><span>{t("Remember welcome screen preference")}</span><input type="checkbox" checked={preferences} onChange={event => setPreferences(event.target.checked)} /></label>
     </div>}
     <div className="cookie-consent-actions">
       <button type="button" onClick={() => save("necessary")}>{t("Reject optional")}</button>
       <button type="button" onClick={() => save("preferences")}>{t("Accept optional")}</button>
       {customize
-        ? <button type="button" onClick={() => save(preferences ? "preferences" : "necessary")}>{t("Save cookie choices")}</button>
-        : <button type="button" onClick={() => setCustomize(true)}>{t("Customize cookies")}</button>}
+        ? <button className="cookie-consent-save" type="button" onClick={() => save(preferences ? "preferences" : "necessary")}>{t("Save cookie choices")}</button>
+        : <button className="cookie-consent-customize" type="button" onClick={() => setCustomize(true)}>{t("Customize cookies")}</button>}
     </div>
   </section> : <button ref={settingsRef} className="cookie-settings-trigger" type="button" onClick={() => {
     setOpen(true);
