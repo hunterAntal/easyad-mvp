@@ -100,14 +100,32 @@ export default function FiltersPanel({
           {locationOptions.map((location) => <option key={location.id} value={location.id}>{t(location.label)}</option>)}
         </select>
       </label>
-      <Range name="radius" label={t("Radius: {count} km", { count: filters.radius })} min={8} max={30} value={filters.radius} onChange={(radius) => setFilters((current) => ({ ...current, radius }))} />
-      <Range name="priceMax" label={t("Max daily rate: {amount}", { amount: formatCurrency(filters.priceMax, locale) })} min={300} max={1000} step={20} value={filters.priceMax} onChange={(priceMax) => setFilters((current) => ({ ...current, priceMax }))} />
+      <div className="filter-pair">
+      <NumberSelect
+        name="radius"
+        label={t("Distance")}
+        value={filters.radius}
+        onChange={(radius) => setFilters((current) => ({ ...current, radius }))}
+        options={[8, 10, 15, 20, 25, 30].map((km) => ({ value: km, label: t("Within {count} km", { count: km }) }))}
+      />
+      <NumberSelect
+        name="priceMax"
+        label={t("Most per day")}
+        value={filters.priceMax}
+        onChange={(priceMax) => setFilters((current) => ({ ...current, priceMax }))}
+        options={[400, 500, 600, 800, 1000].map((amount) => ({
+          value: amount,
+          label: amount >= 1000 ? t("Any price") : t("Up to {amount}", { amount: formatCurrency(amount, locale) }),
+        }))}
+      />
+      </div>
       <button aria-controls="discover-advanced-filters" aria-expanded={advancedOpen} className="filter-disclosure" onClick={toggleAdvanced} type="button">
         <span>{t("More filters")}</span>
         {activeAdvanced ? <span className="filter-disclosure-count">{activeAdvanced}</span> : null}
         <span aria-hidden="true" className="filter-disclosure-chevron">{advancedOpen ? "\u2212" : "+"}</span>
       </button>
       <div className="filter-advanced" hidden={!advancedOpen} id="discover-advanced-filters">
+      <div className="filter-pair">
       <label>
         {t("Format")}
         <select className="select" name="format" value={filters.format} onChange={(event) => setFilters((current) => ({ ...current, format: event.target.value as Filters["format"] }))}>
@@ -121,15 +139,47 @@ export default function FiltersPanel({
           {audiences.map((audience) => <option key={audience} value={audience}>{t(audience === "all" ? "All audiences" : audience)}</option>)}
         </select>
       </label>
+      </div>
+      <div className="filter-pair">
       <label>
         {t("Competitor presence")}
         <select className="select" name="competitor" value={filters.competitor} onChange={(event) => setFilters((current) => ({ ...current, competitor: event.target.value as Filters["competitor"] }))}>
           {["all", "Low", "Medium", "High"].map((level) => <option key={level} value={level}>{t(level === "all" ? "Any level" : level)}</option>)}
         </select>
       </label>
-      <Range name="minImpressions" label={t("Min impressions: {count}", { count: formatNumber(filters.minImpressions) })} min={0} max={180000} step={10000} value={filters.minImpressions} onChange={(minImpressions) => setFilters((current) => ({ ...current, minImpressions }))} />
-      <Range name="minTraffic" label={t("Min traffic: {count}", { count: formatNumber(filters.minTraffic) })} min={0} max={130000} step={5000} value={filters.minTraffic} onChange={(minTraffic) => setFilters((current) => ({ ...current, minTraffic }))} />
-      <Range name="minIncome" label={t("Min income: {amount}", { amount: formatCurrency(filters.minIncome, locale) })} min={0} max={140000} step={5000} value={filters.minIncome} onChange={(minIncome) => setFilters((current) => ({ ...current, minIncome }))} />
+      <NumberSelect
+        name="minImpressions"
+        label={t("Least views")}
+        value={filters.minImpressions}
+        onChange={(minImpressions) => setFilters((current) => ({ ...current, minImpressions }))}
+        options={[0, 25000, 50000, 100000, 150000].map((count) => ({
+          value: count,
+          label: count === 0 ? t("Any") : t("{count}+", { count: formatNumber(count) }),
+        }))}
+      />
+      </div>
+      <div className="filter-pair">
+      <NumberSelect
+        name="minTraffic"
+        label={t("Least passers-by")}
+        value={filters.minTraffic}
+        onChange={(minTraffic) => setFilters((current) => ({ ...current, minTraffic }))}
+        options={[0, 20000, 40000, 80000, 120000].map((count) => ({
+          value: count,
+          label: count === 0 ? t("Any") : t("{count}+", { count: formatNumber(count) }),
+        }))}
+      />
+      <NumberSelect
+        name="minIncome"
+        label={t("Neighbourhood income")}
+        value={filters.minIncome}
+        onChange={(minIncome) => setFilters((current) => ({ ...current, minIncome }))}
+        options={[0, 40000, 60000, 80000, 100000].map((amount) => ({
+          value: amount,
+          label: amount === 0 ? t("Any") : t("{amount}+", { amount: formatCurrency(amount, locale) }),
+        }))}
+      />
+      </div>
       <div className="tag-filter-field">
         <div className="tag-filter-heading">
           <span className="field-label">{t("Device tags")}</span>
@@ -174,8 +224,28 @@ export default function FiltersPanel({
   );
 }
 
-function Range({ label, min, max, step = 1, value, onChange, name }: { label: string; min: number; max: number; step?: number; value: number; onChange: (value: number) => void; name?: string }) {
-  return <label>{label}<input name={name} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+// Sliders cost a label row plus a track row each, and a slider labelled
+// "Min income: $0" asks a shop owner to pick a number they have no basis for.
+// A short list of buckets in a native select is one row, and it reads as a
+// choice rather than a measurement. The stored value stays numeric, so the
+// filtering logic is unchanged.
+function NumberSelect({ label, value, onChange, name, options }: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  name?: string;
+  options: Array<{ value: number; label: string }>;
+}) {
+  const nearest = options.reduce((best, option) =>
+    Math.abs(option.value - value) < Math.abs(best.value - value) ? option : best, options[0]);
+  return (
+    <label>
+      {label}
+      <select className="select" name={name} value={String(nearest.value)} onChange={(event) => onChange(Number(event.target.value))}>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
 }
 
 function formatCurrency(value: number, locale: "en" | "fr") {

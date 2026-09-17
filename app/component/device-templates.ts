@@ -24,3 +24,13 @@ export function resolveDeviceTemplate(param: string | undefined, configured?: Di
   if (isDeviceTemplate(configured)) return configured;
   return "fullscreen";
 }
+
+// The city line a public screen shows. The public playback page, the screen
+// profile and the Discover preview share one rule, so a buyer previews the same
+// line the physical screen displays. The government network view deliberately
+// keeps its own rule, which shows the last two address parts instead.
+// Known limit: for "500 Donald Street East, Thunder Bay, ON" this returns "ON".
+export function deriveScreenCity(address: string) {
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts.slice(-1)[0] : "Thunder Bay, ON";
+}

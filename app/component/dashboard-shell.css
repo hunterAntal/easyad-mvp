@@ -1027,3 +1027,368 @@
   line-height: 1.15;
 }
 }
+
+/* ---- Collapsed icon rail --------------------------------------------------
+   The label is clipped, not removed, so every nav item keeps its accessible
+   name and a screen reader still announces "Find screens" on an icon. */
+.sidebar-rail-toggle {
+  color: #9fb0bb;
+  background: #ffffff0f;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--radius-sm);
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  position: absolute;
+  top: 18px;
+  right: 12px;
+  transition: background .14s, color .14s;
+}
+
+.sidebar-rail-toggle:hover {
+  color: #fff;
+  background: #ffffff1f;
+}
+
+.sidebar-rail-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The rail applies only where the sidebar is a column. It was unscoped, and a
+   max-width:1180px block forced the shell to one column on the false belief
+   that the sidebar is already a top bar there. It is not: it stays a 244px
+   column down to 901px and becomes a bar at 900px. Between those widths the
+   collapsed rail stretched to the full screen, pushed the workspace below the
+   fold, and the same block hid the only control that could undo it. */
+@media (min-width: 901px) {
+
+.shell.is-rail {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.sidebar.is-rail {
+  align-items: center;
+  padding: 60px 10px 14px;
+}
+
+.sidebar.is-rail .sidebar-rail-toggle {
+  right: 50%;
+  transform: translateX(50%);
+}
+
+.sidebar.is-rail .nav {
+  align-items: center;
+}
+
+.sidebar.is-rail .nav-group {
+  justify-items: center;
+}
+
+.sidebar.is-rail .nav-label,
+.sidebar.is-rail .nav-group-label,
+/* .brand-mark is itself a div inside .brand, so a bare ".brand div" clipped the
+   "EA" badge to 1x1 and left a hole at the top of the rail. */
+.sidebar.is-rail .brand > div:not(.brand-mark),
+.sidebar.is-rail .tenant-identity,
+.sidebar.is-rail .workspace-switcher-copy,
+.sidebar.is-rail .workspace-switcher-chevron,
+.sidebar.is-rail .government-scope-card div,
+.sidebar.is-rail .government-marketplace-link span,
+.sidebar.is-rail .sidebar-signout span {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+}
+
+.sidebar.is-rail .nav-group {
+  gap: 6px;
+}
+
+.sidebar.is-rail .nav-group + .nav-group {
+  border-top: 1px solid #ffffff14;
+  margin-top: 8px;
+  padding-top: 12px;
+}
+
+/* Every control in the rail is the same 44px square. Before this the nav items
+   were 48x40, the workspace switcher 48x60 and the toggle 30x30, so three
+   different shapes stacked down one column and the active highlight read as a
+   stretched box rather than a button. */
+/* Only the selected item carries a surface. Everything else is a bare icon.
+   Before this the column stacked five different treatments -- a bordered
+   toggle, a filled white badge, a bordered switcher, bare icons, then a green
+   box -- which is what read as disorganised. Alignment was never the fault. */
+.sidebar.is-rail .nav a,
+.sidebar.is-rail .workspace-switcher-button,
+.sidebar.is-rail .government-marketplace-link,
+.sidebar.is-rail .sidebar-signout,
+.sidebar.is-rail .sidebar-rail-toggle {
+  color: #93a4b0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  justify-content: center;
+  place-items: center;
+  gap: 0;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+/* .nav a is a grid of "20px minmax(0,1fr) 5px". The 1fr track fills the box and
+   pins the icon into the 20px column on the left, 11.5px off centre, however
+   well the box itself is centred. Collapsing the tracks is what moves the
+   glyph. Same for the workspace switcher, which was 8.5px off for the same
+   reason. */
+.sidebar.is-rail .nav a,
+.sidebar.is-rail .nav button,
+.sidebar.is-rail .workspace-switcher-button,
+.sidebar.is-rail .sidebar-signout {
+  grid-template-columns: auto;
+  grid-template-rows: auto;
+  justify-content: center;
+  align-content: center;
+  gap: 0;
+}
+
+.sidebar.is-rail .nav a svg,
+.sidebar.is-rail .workspace-switcher-button svg,
+.sidebar.is-rail .sidebar-signout svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The selected item reads by weight, not by a faint tint: a green wash, a green
+   icon, and a green edge. Same ladder as ADR 0007. */
+.sidebar.is-rail .nav a.active {
+  color: #7fd3b1;
+  background: #1f7a5a2e;
+  border-color: #1f7a5a8c;
+}
+
+.sidebar.is-rail .workspace-switcher-icon {
+  margin: 0;
+}
+
+/* The switcher's wrapper carries its own 46x62 panel, which sat behind the
+   44x44 button and read as a second, larger box. In the rail the button is the
+   only surface. */
+.sidebar.is-rail .workspace-switcher {
+  background: none;
+  border: 0;
+  width: 44px;
+  padding: 0;
+}
+
+.sidebar.is-rail .brand-mark {
+  border-radius: 10px;
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+/* The workspace switcher is a control, not a destination. It was carrying its
+   own green, so two different green boxes sat in one column and neither read
+   as "you are here". Only the selected nav item is green now. */
+.sidebar.is-rail .nav a:hover,
+.sidebar.is-rail .workspace-switcher-button:hover,
+.sidebar.is-rail .sidebar-signout:hover,
+.sidebar.is-rail .sidebar-rail-toggle:hover {
+  color: #fff;
+  background: #ffffff14;
+  border-color: transparent;
+}
+
+/* The badge is the app mark, not a button. Dark on dark with a hairline, so it
+   identifies the product without being the loudest thing in the column. */
+.sidebar.is-rail .brand-mark {
+  color: #cfe0d8;
+  background: #ffffff0d;
+  border: 1px solid #ffffff1f;
+  font-size: .72rem;
+}
+
+.sidebar.is-rail .workspace-switcher-icon {
+  color: inherit;
+  background: none;
+  width: auto;
+  height: auto;
+}
+
+.sidebar.is-rail .workspace-switcher-icon svg {
+  color: inherit;
+}
+
+/* The sign-out sits in a form inside the tenant card, which was not centring
+   its own child. Measured 22.5px off the column. */
+.sidebar.is-rail .tenant-card {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  width: 100%;
+  margin-top: auto;
+  display: grid;
+}
+
+.sidebar.is-rail .tenant-card form {
+  justify-items: center;
+  width: 100%;
+  display: grid;
+}
+
+.sidebar.is-rail .tenant-avatar {
+  display: none;
+}
+
+.sidebar.is-rail .nav-active-mark {
+  display: none;
+}
+
+.sidebar.is-rail .brand,
+.sidebar.is-rail .tenant-card,
+.sidebar.is-rail .government-scope-card {
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+
+.sidebar.is-rail .tenant-card {
+  border: 0;
+  background: none;
+}
+
+}
+
+/* At 900px and below the sidebar is a top bar and the rail does not exist, so
+   the control that toggles it is not shown. */
+@media (max-width: 900px) {
+  .sidebar-rail-toggle {
+    display: none;
+  }
+}
+
+/* ---- Buying steps ---------------------------------------------------------
+   Replaces a static "Step 1 of 4" eyebrow that promised a fourth step the
+   product does not have. Each step is a real control, the current one carries
+   aria-current="step", and a step that cannot be reached yet says why instead
+   of leading to an empty screen. */
+.buying-steps {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.buying-step {
+  align-items: center;
+  display: flex;
+}
+
+.buying-step + .buying-step::before {
+  content: "";
+  background: var(--line-strong);
+  width: 14px;
+  height: 1px;
+  margin-right: 6px;
+}
+
+.buying-step > a,
+.buying-step > span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 6px;
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  transition: background .14s, border-color .14s, color .14s;
+}
+
+.buying-step-mark {
+  border-radius: 50%;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: .7rem;
+  font-weight: 800;
+  display: grid;
+}
+
+.buying-step-mark svg {
+  width: 12px;
+  height: 12px;
+}
+
+.buying-step.is-current > a {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: var(--green);
+}
+
+.buying-step.is-current .buying-step-mark {
+  color: #fff;
+  background: var(--green);
+}
+
+.buying-step.is-done > a {
+  color: var(--state-success-ink);
+  background: var(--panel);
+  border-color: #9dc9b5;
+}
+
+.buying-step.is-done .buying-step-mark {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+}
+
+.buying-step.is-ahead > a {
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.buying-step.is-ahead .buying-step-mark {
+  color: var(--muted);
+  background: var(--state-idle-surface);
+}
+
+.buying-step.is-ahead > a:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+/* Not a dead control: it states the reason on hover and is not a link. */
+.buying-step.is-locked > span {
+  color: var(--faint, #8a949c);
+  background: var(--state-idle-surface);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.buying-step.is-locked .buying-step-mark {
+  color: var(--muted);
+  background: #0000;
+}
+
+@media (max-width: 560px) {
+  .buying-step-label {
+    display: none;
+  }
+
+  .buying-step > a,
+  .buying-step > span {
+    padding: 5px;
+  }
+}

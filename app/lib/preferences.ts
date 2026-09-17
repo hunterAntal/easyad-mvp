@@ -20,3 +20,7 @@ export function writeBrowserPreference(name: string, value: string, maxAge: numb
   if (typeof document === "undefined") return;
   document.cookie = `${name}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`;
 }
+
+// Whether the workspace sidebar is collapsed to an icon rail.
+export const SIDEBAR_COOKIE_NAME = "ooh_nav_collapsed";
+export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;

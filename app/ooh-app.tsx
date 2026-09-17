@@ -21,6 +21,7 @@ import type { BookingDraft, CreativeDraft, Filters, MapPoint } from "./types";
 import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
 import type { DbUser } from "./lib/db";
 import { canAccessInstitutionWorkspace } from "./roles";
+import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME, readBrowserPreference, writeBrowserPreference } from "./lib/preferences";
 import { useI18n } from "./i18n/client";
 import type { FeatureFlags } from "./lib/feature-flags";
 import { isInventoryAvailableForDates } from "./lib/inventory-availability";
@@ -76,6 +77,18 @@ export default function OohApp({
   surface?: "marketplace" | "government";
 }) {
   const { t } = useI18n();
+  // Starts expanded on the server and the first client render so the markup
+  // matches, then adopts the remembered choice.
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  useEffect(() => {
+    if (readBrowserPreference(SIDEBAR_COOKIE_NAME) === "1") setNavCollapsed(true);
+  }, []);
+  function toggleNavCollapsed() {
+    setNavCollapsed((open) => {
+      writeBrowserPreference(SIDEBAR_COOKIE_NAME, open ? "0" : "1", SIDEBAR_COOKIE_MAX_AGE);
+      return !open;
+    });
+  }
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
   const [role, setRole] = useState<Role>(startingRole);
   const [view, setView] = useState<View>(initialView);
@@ -614,10 +627,10 @@ export default function OohApp({
   }
 
   return (
-    <div className={`shell${surface === "government" ? " government-shell" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} />
+    <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
+      <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} />
+        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} setView={setView} surface={surface} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>

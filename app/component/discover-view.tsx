@@ -1,17 +1,19 @@
 "use client";
 
 import "./discover-view.css";
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { Booking, InventoryItem, businesses, formats } from "../data";
 import type { Filters, MapPoint } from "../types";
 import { defaultFilters, formatRatio, mapDistanceKm, money, number } from "../utils";
 import FiltersPanel from "./filters-panel";
 import MapLibreInventoryMap from "./maplibre-inventory-map";
-import PlacePanel from "./place-panel";
+import { PlaceComments } from "./place-panel";
+import DeviceScreen from "./device-screen";
+import { deriveScreenCity, resolveDeviceTemplate } from "./device-templates";
 import { Meter, Metric, PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
 import { inventoryAvailabilityLabel } from "../lib/inventory-availability";
-import { isStaticInventory } from "../lib/inventory-delivery";
+import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 
 export default function DiscoverView(props: {
   filters: Filters;
@@ -32,13 +34,11 @@ export default function DiscoverView(props: {
   canComment?: boolean;
 }) {
   const { t } = useI18n();
-  const [openPlaceId, setOpenPlaceId] = useState<string | null>(null);
-  const openPlace = openPlaceId ? props.inventory.find((item) => item.id === openPlaceId) ?? null : null;
   return (
     <section className="grid discover-grid">
       <div className="panel filters-panel">
-        <PanelHeading eyebrow="Filters" title="Narrow your search" action={<button className="ghost-button" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>} />
         <FiltersPanel {...props} />
+        <button className="ghost-button filters-reset" type="button" onClick={() => props.setFilters(defaultFilters)}>{t("Reset")}</button>
       </div>
       <div className="map-stage">
         <MapLibreInventoryMap
@@ -51,7 +51,10 @@ export default function DiscoverView(props: {
           onAreaChange={props.onAreaChange}
           initialZoom={props.mapZoom}
           onSelect={props.setSelectedInventoryId}
-          onMarkerOpen={(itemId) => { props.setSelectedInventoryId(itemId); setOpenPlaceId(itemId); }}
+          // A pin click does exactly what a list click does: select the screen
+          // and update the one detail card. It used to also open a modal over
+          // that card, so one click changed two surfaces.
+          onMarkerOpen={props.setSelectedInventoryId}
         />
       </div>
       <div className="panel list-panel">
@@ -62,12 +65,14 @@ export default function DiscoverView(props: {
           ))}
         </div>
       </div>
-      <div className="panel detail-panel">
-        <InventoryDetail item={props.selectedInventory} bookings={props.bookings} onBook={props.onBook} />
+      {/* The dock stretches over the map so the card has a height it can be capped
+          against. A percentage max-height on the card itself is ignored for a grid
+          item aligned to the end, which let the card run under the search bar. */}
+      <div className="detail-dock">
+        <div className="panel detail-panel">
+          <InventoryDetail item={props.selectedInventory} bookings={props.bookings} onBook={props.onBook} canComment={Boolean(props.canComment)} />
+        </div>
       </div>
-      {openPlace ? (
-        <PlacePanel item={openPlace} canComment={Boolean(props.canComment)} onClose={() => setOpenPlaceId(null)} />
-      ) : null}
     </section>
   );
 }
@@ -99,15 +104,35 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
   );
 }
 
-function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; bookings: Booking[]; onBook: () => void }) {
+function InventoryDetail({ item, bookings, onBook, canComment }: { item: InventoryItem; bookings: Booking[]; onBook: () => void; canComment: boolean }) {
   const { locale, formatNumber, t } = useI18n();
   const spec = formats[item.format];
   const campaigns = bookings.filter((booking) => booking.inventoryId === item.id);
   const availability = inventoryAvailabilityLabel(item);
   return (
     <>
+      {/* The image of the screen is the screen itself: the same 16:9 frame a
+          passer-by sees, clock, weather and all. It replaces a "Photo coming
+          soon" placeholder that no data could ever fill. A static billboard shows
+          no clock, so it gets no preview. The empty media area says where the
+          buyer's ad would play, instead of the operator-facing "No images or
+          videos have been uploaded", which stays on the real public screen. */}
+      {isDigitalInventory(item) ? (
+        <ScaledScreenPreview>
+          <DeviceScreen
+            inventoryName={item.name}
+            city={deriveScreenCity(item.address)}
+            imageInterval={item.imageInterval}
+            slides={[]}
+            template={resolveDeviceTemplate(undefined, item.displayTemplate)}
+            displayLanguage={item.displayLanguage ?? "en"}
+            mediaContent={<div className="detail-preview-empty">{t("Your ad plays here")}</div>}
+            preview
+          />
+        </ScaledScreenPreview>
+      ) : null}
       <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Book")}</button>} />
-      <div className="detail-grid">
+      <div className="detail-grid stat-tiles">
         <Metric label="Format" value={t(spec.label)} />
         <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />
         <Metric label="Impressions" value={formatNumber(item.impressions)} />
@@ -119,12 +144,19 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
           decides a booking on. The full profile still carries every one of
           them, so this defers detail without removing capability. */}
       <a className="detail-profile-link" href={`/inventory/${item.id}`}>{t("See everything about this screen")}</a>
-      <div className="spec-box">
-        <strong>{t("Creative spec")}</strong>
-        <span>{t(spec.spec)}</span>
-        <span>{t("Aspect ratio {ratio} with {percent}% safe zone.", { ratio: formatRatio(spec.ratio), percent: spec.safeZone })}</span>
-      </div>
-      {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      {/* The card floats over the map, so only the figures a person decides on
+          stay open. The production spec and the tags are not carried by the
+          profile page, so they are collapsed here rather than removed. */}
+      <details className="detail-more">
+        <summary>{t("Size, file types and tags")}</summary>
+        <div className="spec-box">
+          <strong>{t("Creative spec")}</strong>
+          <span>{t(spec.spec)}</span>
+          <span>{t("Aspect ratio {ratio} with {percent}% safe zone.", { ratio: formatRatio(spec.ratio), percent: spec.safeZone })}</span>
+        </div>
+        {item.tags?.length ? <div className="device-tag-list detail-tags">{item.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div> : null}
+      </details>
+      <PlaceComments item={item} canComment={canComment} />
       <div className="timeline">
         {campaigns.length ? campaigns.map((booking) => (
           <div key={booking.id}>
@@ -141,5 +173,37 @@ function InventoryDetail({ item, bookings, onBook }: { item: InventoryItem; book
         )}
       </div>
     </>
+  );
+}
+
+// DeviceScreen sizes its text in vw and fills its container, because it was
+// built for a full-width player. At card width that overflows. The stage
+// renders it at the size the profile page shows it, then scales the whole frame
+// down, so the card holds a faithful thumbnail rather than a squashed layout.
+// The initial scale is a constant so server and client markup match; the real
+// width is measured after mount.
+const PREVIEW_STAGE_WIDTH = 1280;
+
+function ScaledScreenPreview({ children }: { children: ReactNode }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.25);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const update = () => {
+      if (frame.clientWidth) setScale(frame.clientWidth / PREVIEW_STAGE_WIDTH);
+    };
+    update();
+    if (!("ResizeObserver" in window)) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="detail-preview" ref={frameRef}>
+      <div className="detail-preview-stage" style={{ transform: `scale(${scale})` }}>{children}</div>
+    </div>
   );
 }

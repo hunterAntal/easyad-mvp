@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMemo, useState } from "react";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { InventoryItem } from "../app/data";
 import DiscoverView from "../app/component/discover-view";
 import { defaultFilters } from "../app/utils";
@@ -14,6 +14,12 @@ vi.mock("../app/component/maplibre-inventory-map", () => ({
     <button type="button" onClick={() => onMarkerOpen?.("INV-2")}>Map marker</button>
   ),
 }));
+
+// The detail card loads location comments on mount. Answer with an empty list
+// so the tests never depend on a network.
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ comments: [] }) })));
+});
 
 const inventory: InventoryItem[] = [
   {
@@ -91,6 +97,28 @@ function DiscoverHarness() {
 }
 
 describe("discover view state", () => {
+  test("a map pin selects the screen in the card and opens no pop-up", async () => {
+    const user = userEvent.setup();
+    render(<DiscoverHarness />);
+
+    expect(screen.getByRole("button", { name: /downtown screen/i })).toHaveClass("selected");
+    await user.click(screen.getByRole("button", { name: "Map marker" }));
+
+    // One click, one surface. The pin used to open a modal as well.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /airport digital/i })).toHaveClass("selected");
+    expect(screen.getByRole("heading", { name: "Airport Digital" })).toBeInTheDocument();
+  });
+
+  test("the card shows the screen preview and keeps comments inside it", async () => {
+    render(<DiscoverHarness />);
+
+    expect(screen.getByText("Your ad plays here")).toBeInTheDocument();
+    expect(screen.getByText("Comments")).toBeInTheDocument();
+    expect(await screen.findByText("No comments yet. Be the first to share what you know about this spot.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   test("inventory cards and map markers select internally without changing the URL", async () => {
     const user = userEvent.setup();
     window.history.pushState({}, "", "/?role=advertiser&view=discover&itemId=INV-1");

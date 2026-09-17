@@ -76,13 +76,9 @@ The local compose setup creates:
 
 ### Application origin and port
 
-The `npm run dev` command uses port 3000. Another application can hold port 3000. Start the server on a different port in this condition:
+The `npm run dev` and `npm run start` commands are pinned to port **3001** in `package.json`. The port is fixed on purpose. Another EasyAD prototype runs on port 3000 on at least one machine, and an unpinned port let the two be confused for each other, which cost real debugging time.
 
-```bash
-npx next dev -p 3001
-```
-
-Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
+Always open `http://localhost:3001`. Set `APP_ORIGIN` in `.env.local` to the same port. The public device media API builds each value in `links` from `APP_ORIGIN`. A wrong `APP_ORIGIN` value gives a link to the wrong port.
 
 Run the PostgreSQL integration test with:
 
@@ -141,6 +137,23 @@ Use `--line-strong` for the edge of a control. Use `--line` for a decorative hai
 
 The tokens live in [`app/globals.css`](app/globals.css), which stays canonical. [DESIGN.md](DESIGN.md) mirrors them. The measured basis, the rejected alternatives, and the AODA obligation are in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
 
+## Session Skills
+
+`.claude/skills/` holds skills that ship with this repository, so every person
+working on it gets the same routine.
+
+| Skill | Say | What it does |
+|---|---|---|
+| `lights-on` | "lights on", "start up", "pick up where we left off" | Fetches what teammates pushed, starts PostgreSQL and the dev server on 3001, checks the app answers, and summarizes the last session |
+| `lights-off` | "lights off", "wrap up", "shut down" | Verifies the work, updates `README.md` and `DESIGN.md`, commits to the feature branch, stops servers this session started, and reports what is left |
+
+The pair is deliberate. `lights-on` opens the day and `lights-off` closes it.
+
+Neither one pushes, opens a pull request, or merges. Those reach other people,
+so they ask instead. `lights-off` also refuses to commit when `npm test`, `tsc`
+or `npm run build` fails, and `lights-on` never discards local work to make a
+pull succeed.
+
 ## Advertiser Vocabulary
 
 The product serves two populations with one component set. Operators, institutions, and government staff are trained, so their screens keep the precise operational terms: loop time, inventory, occupancy. An advertiser is often a small-business owner buying outdoor media for the first time, so advertiser screens name the task instead of the trade.
@@ -150,6 +163,20 @@ Role selects the vocabulary on every shared screen, through an `isAdvertiser` fl
 No screen is forked. `advertiserViewTitles` and `advertiserGroupLabel` in [`app/component/dashboard-shell.tsx`](app/component/dashboard-shell.tsx) hold the advertiser wording, and the rest is the English string in each advertiser-only component.
 
 Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) whenever you change an English string. The English text is the lookup key, so a changed string without a matching French entry silently falls back to English.
+
+The collapsed sidebar rail lives in `app/component/dashboard-shell.css` inside `@media (min-width: 901px)`. The sidebar turns into a top bar at 900px, not at 1180px. An earlier rule assumed 1180px, forced the shell to one column between 901px and 1180px, and the collapsed rail then filled the whole screen with its toggle hidden. Measure a breakpoint in the running layout before writing a rule against it.
+
+Map marker and tile positions in `app/component/maplibre-inventory-map.tsx` are rounded to a tenth of a pixel. The browser shortens an inline style to six significant digits, so an unrounded float in server HTML reads back as a different value and causes a hydration mismatch.
+
+Discover uses two columns. The filters are one horizontal bar above the map and the result list. The selected screen's detail floats over the map. `.discover-grid` in [`app/component/discover-view.css`](app/component/discover-view.css) is declared twice; the lower rule wins on source order and holds the layout. Keep the column count in every media query equal to the column count in `grid-template-areas`, or a phantom track appears and the map collapses.
+
+A map pin and a result card both select a screen; there is no pin modal. `PlaceComments` in [`app/component/place-panel.tsx`](app/component/place-panel.tsx) renders location comments inside the detail card. The card preview renders `DeviceScreen` on a 1280px stage and scales the whole frame to the card, because `DeviceScreen` sizes its text in `vw` and would overflow a card. A digital screen gets the preview; a static billboard does not.
+
+The floating card sits inside `.detail-dock`, which uses `contain: size`. Keep it. The dock shares the map's grid row, and without containment the card's own height stretched that row, so the card was never capped and ran under the map search bar and past the map. A percentage `max-height` on the card does not help: Chrome does not resolve it for a grid item aligned to the end. Below 1120px the dock returns to normal flow with `contain: none`, or it collapses to zero height.
+
+Known limit: public screens show "ON" instead of "Thunder Bay, ON". `deriveScreenCity` in [`app/component/device-templates.ts`](app/component/device-templates.ts) keeps only the last address part. The profile page, the public playback page and the Discover preview share it, so the fix is one line, but it changes what physical screens display.
+
+The advertiser buying flow shows a three-step indicator in the top bar: Find screens, Book dates, Make an ad. Booking already takes the ad picture, so a person can buy screen time in two steps. Make an ad is a separate task for a campaign that is already booked, and it stays locked until one exists.
 
 Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
 

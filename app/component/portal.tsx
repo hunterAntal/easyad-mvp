@@ -228,7 +228,7 @@ function AdvertiserHome({
             <ProtectedPortalLink className="primary-button" currentUser={currentUser} role="advertiser" view="discover" onLaunch={launch}>Find screens near you</ProtectedPortalLink>
             {bookings.length ? <ProtectedPortalLink className="ghost-button" currentUser={currentUser} role="advertiser" view="campaigns" onLaunch={launch}>See your campaigns</ProtectedPortalLink> : null}
           </div>
-          <div className="portal-stats">
+          <div className="portal-stats stat-tiles">
             <Metric label="Screens you can book" value={availableInventory.length} />
             <Metric label="Ads running" value={live} />
             <Metric label="Waiting for approval" value={waiting} />
