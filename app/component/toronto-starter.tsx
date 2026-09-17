@@ -5,10 +5,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { ArrowUpRight } from "lucide-react";
 import { INTRO_COOKIE_MAX_AGE, INTRO_COOKIE_NAME } from "../lib/preferences";
+
 import { LanguageSelector, useI18n } from "../i18n/client";
+import { readCookieConsent } from "../lib/cookie-consent";
 import { mapLibreLocale } from "../i18n/maplibre";
 
-const overviewCenter: [number, number] = [-96, 56];
+const downtownTorontoCenter: [number, number] = [-79.3832, 43.6532];
 
 export default function TorontoStarter({ show, children }: { show: boolean; children: ReactNode }) {
   const { t } = useI18n();
@@ -44,7 +46,7 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
   }, [visible]);
 
   function enterPortal() {
-    if (remember) {
+    if (remember && readCookieConsent() === "preferences") {
       const secure = window.location.protocol === "https:" ? "; Secure" : "";
       document.cookie = `${INTRO_COOKIE_NAME}=1; Max-Age=${INTRO_COOKIE_MAX_AGE}; Path=/; SameSite=Lax${secure}`;
     }
@@ -55,7 +57,7 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
   if (!visible) return children;
 
   return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label={t("Ad campaign starter")}>
-    <TorontoThreeDimensionalMap location={location} />
+    <TorontoThreeDimensionalMap location={location ?? (locating ? null : downtownTorontoCenter)} />
     <div className="toronto-map-wash" aria-hidden="true" />
     <header className="toronto-starter-brand">
       <strong>{t("EasyAD Platform")}</strong>
@@ -74,7 +76,7 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
           <span>{t("Start my campaign")}</span>
           <i className="starter-cta-arrow" aria-hidden="true"><ArrowUpRight /></i>
         </button>
-        <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>{t("Don't show this screen again")}</span></label>
+        <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>{t("Don't show this screen again")} — {t("Requires optional cookies")}</span></label>
       </div>
       <ul className="starter-features" aria-label={t("Platform capabilities")}>
         <li>{t("Geospatial discovery")}</li>
@@ -85,7 +87,7 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
     <footer className="toronto-starter-meta">
       <span role="status">{location
         ? `${Math.abs(location[1]).toFixed(4)} ${location[1] < 0 ? "S" : "N"} / ${Math.abs(location[0]).toFixed(4)} ${location[0] < 0 ? "W" : "E"}`
-        : t(locating ? "Finding your location…" : "Location unavailable — showing Canada overview")}</span>
+        : t(locating ? "Finding your location…" : "Location unavailable — showing downtown Toronto")}</span>
       <span>{t("Building geometry / OpenStreetMap")}</span>
     </footer>
   </main>;
@@ -106,8 +108,8 @@ function TorontoThreeDimensionalMap({ location }: { location: [number, number] |
       map = new maplibregl.Map({
         container: containerRef.current,
         style: "https://tiles.openfreemap.org/styles/liberty",
-        center: locationRef.current ?? overviewCenter,
-        zoom: locationRef.current ? 14.7 : 3,
+        center: locationRef.current ?? downtownTorontoCenter,
+        zoom: 14.7,
         pitch: 62,
         bearing: -28,
         canvasContextAttributes: { antialias: true },

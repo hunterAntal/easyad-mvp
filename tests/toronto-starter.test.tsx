@@ -29,12 +29,12 @@ test.each([true, false])('centers on geolocation whether it resolves before map 
   expect(mock.easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ center: [151.2093, -33.8688], zoom: 15.55 }));
   expect(screen.getByRole('status')).toHaveTextContent('33.8688 S / 151.2093 E');
 });
-test('denied or timed-out location leaves an explicitly labeled overview', () => {
+test.each([1, 2, 3])('unavailable location falls back to downtown Toronto (error %s)', (code) => {
   render(<TorontoStarter show><div>Portal</div></TorontoStarter>);
-  act(() => failure({ code: 1 } as GeolocationPositionError)); load();
-  expect(mock.options.center).toEqual([-96, 56]);
-  expect(mock.easeTo).not.toHaveBeenCalled();
-  expect(screen.getByRole('status')).toHaveTextContent('Location unavailable');
+  act(() => failure({ code } as GeolocationPositionError)); load();
+  expect(mock.options.center).toEqual([-79.3832, 43.6532]);
+  expect(mock.easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ center: [-79.3832, 43.6532], zoom: 15.55 }));
+  expect(screen.getByRole('status')).toHaveTextContent('Location unavailable — showing downtown Toronto');
 });
 test('unsupported geolocation still lets users enter the portal', () => {
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined });
