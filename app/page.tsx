@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import TorontoStarter from "./component/toronto-starter";
 import { INTRO_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
+import { CONSENT_COOKIE_NAME } from "./lib/cookie-consent";
 import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
 import GovernmentAccessDenied from "./component/government-access-denied";
 import { getFeatureFlags } from "./lib/feature-flags";
@@ -40,7 +41,8 @@ export default async function Page({ searchParams }: PageProps) {
   const requestedRole = isGovernmentSurface ? user?.role : isRole(role) ? role : user?.role;
   const requestedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
   const cookieStore = await cookies();
-  const showStarter = !isGovernmentSurface && shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
+  const introPreference = cookieStore.get(CONSENT_COOKIE_NAME)?.value === "v1.preferences" ? cookieStore.get(INTRO_COOKIE_NAME)?.value : undefined;
+  const showStarter = !isGovernmentSurface && shouldShowStarter(requestedView, introPreference);
 
   if (!user && (isGovernmentSurface || requestedView !== "portal")) {
     const destination = isGovernmentSurface ? governmentPathFromParams(params) : queryFromParams(params);
